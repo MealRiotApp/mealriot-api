@@ -35,7 +35,12 @@ async def get_current_user(
     token = authorization.split(" ", 1)[1]
     payload = decode_jwt(token)
 
-    supabase_id = payload.get("sub", "")
+    supabase_id = payload.get("sub")
+    if not supabase_id:
+        raise HTTPException(
+            status_code=401,
+            detail={"error": {"code": "UNAUTHORIZED", "message": "Token missing subject claim"}},
+        )
     email = payload.get("email", "")
     meta = payload.get("user_metadata") or {}
     name = meta.get("full_name") or email.split("@")[0]
