@@ -1,12 +1,41 @@
+import pytest
+import pytest_asyncio
+from httpx import AsyncClient, ASGITransport
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
+from app.main import app
+from app.core.database import Base, get_db
 import uuid
+
+TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
+
+
+@pytest_asyncio.fixture
+async def db():
+    engine = create_async_engine(TEST_DATABASE_URL)
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    session_factory = async_sessionmaker(engine, expire_on_commit=False)
+    async with session_factory() as session:
+        yield session
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
+    await engine.dispose()
+
+
+@pytest_asyncio.fixture
+async def client(db: AsyncSession):
+    async def override_db():
+        yield db
+
+    app.dependency_overrides[get_db] = override_db
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        yield c
+    app.dependency_overrides.clear()
 
 
 def make_jwt_payload(email: str, supabase_id: str | None = None) -> dict:
-    """Helper to build a fake Supabase JWT payload for tests."""
     return {
         "sub": supabase_id or str(uuid.uuid4()),
         "email": email,
         "user_metadata": {"full_name": "Test User", "avatar_url": None},
     }
-
-# DB fixtures (db, client) will be added in Task 2 once database.py exists
