@@ -9,7 +9,6 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
-from sqlalchemy.dialects import postgresql
 
 
 # revision identifiers, used by Alembic.
@@ -22,7 +21,7 @@ depends_on: Union[str, Sequence[str], None] = None
 def upgrade() -> None:
     op.create_table(
         "users",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
+        sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("supabase_id", sa.String(), nullable=False, unique=True),
         sa.Column("email", sa.String(), nullable=False, unique=True),
         sa.Column("name", sa.String(), nullable=False),
@@ -45,14 +44,14 @@ def upgrade() -> None:
 
     op.create_table(
         "food_entries",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False, index=True),
+        sa.Column("id", sa.String(36), primary_key=True),
+        sa.Column("user_id", sa.String(36), nullable=False, index=True),
         sa.Column("description", sa.Text(), nullable=False),
         sa.Column("source", sa.String(), nullable=False),
         sa.Column("image_url", sa.String(), nullable=True),
         sa.Column("logged_at", sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now()),
         sa.Column("meal_type", sa.String(), nullable=False, server_default="snack"),
-        sa.Column("items", postgresql.JSONB(), nullable=False),
+        sa.Column("items", sa.JSON(), nullable=False),
         sa.Column("total_calories", sa.Integer(), nullable=False),
         sa.Column("total_protein_g", sa.Numeric(6, 2), nullable=False),
         sa.Column("total_fat_g", sa.Numeric(6, 2), nullable=False),
@@ -63,8 +62,8 @@ def upgrade() -> None:
 
     op.create_table(
         "recent_foods",
-        sa.Column("id", postgresql.UUID(as_uuid=True), primary_key=True),
-        sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
+        sa.Column("id", sa.String(36), primary_key=True),
+        sa.Column("user_id", sa.String(36), nullable=False),
         sa.Column("food_name", sa.String(), nullable=False),
         sa.Column("food_name_he", sa.String(), nullable=True),
         sa.Column("grams", sa.Numeric(6, 2), nullable=False),
