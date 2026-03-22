@@ -1,0 +1,94 @@
+import uuid
+import json
+from datetime import datetime
+from sqlalchemy import String, Integer, Numeric, Text, DateTime, JSON, func, UniqueConstraint
+from sqlalchemy.types import TypeDecorator, CHAR
+from sqlalchemy.orm import Mapped, mapped_column
+from app.core.database import Base
+
+
+class GUID(TypeDecorator):
+    """Platform-independent GUID type. Uses PostgreSQL's UUID, uses CHAR(36) on other backends."""
+    impl = CHAR
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == "postgresql":
+            from sqlalchemy.dialects.postgresql import UUID as PGUUID
+            return dialect.type_descriptor(PGUUID())
+        return dialect.type_descriptor(CHAR(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == "postgresql":
+            return str(value)
+        return str(value)
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        return uuid.UUID(value) if not isinstance(value, uuid.UUID) else value
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    supabase_id: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    email: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    avatar_url: Mapped[str | None] = mapped_column(String)
+    role: Mapped[str] = mapped_column(String, nullable=False, default="member")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    language: Mapped[str] = mapped_column(String, nullable=False, default="en")
+    theme: Mapped[str] = mapped_column(String, nullable=False, default="ocean")
+    daily_cal_goal: Mapped[int | None] = mapped_column(Integer)
+    daily_protein_goal_g: Mapped[int | None] = mapped_column(Integer)
+    daily_fat_goal_g: Mapped[int | None] = mapped_column(Integer)
+    daily_carbs_goal_g: Mapped[int | None] = mapped_column(Integer)
+    age: Mapped[int | None] = mapped_column(Integer)
+    weight_kg: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    height_cm: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    activity_level: Mapped[str | None] = mapped_column(String)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class FoodEntry(Base):
+    __tablename__ = "food_entries"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
+    source: Mapped[str] = mapped_column(String, nullable=False)  # text | image | barcode
+    image_url: Mapped[str | None] = mapped_column(String)
+    logged_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    meal_type: Mapped[str] = mapped_column(String, nullable=False, default="snack")
+    items: Mapped[dict] = mapped_column(JSON, nullable=False)
+    total_calories: Mapped[int] = mapped_column(Integer, nullable=False)
+    total_protein_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    total_fat_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    total_carbs_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+
+class RecentFood(Base):
+    __tablename__ = "recent_foods"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
+    food_name: Mapped[str] = mapped_column(String, nullable=False)
+    food_name_he: Mapped[str | None] = mapped_column(String)
+    grams: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    calories: Mapped[int] = mapped_column(Integer, nullable=False)
+    protein_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    fat_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    carbs_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
+    use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "food_name", name="uq_recent_foods_user_food"),
+    )
