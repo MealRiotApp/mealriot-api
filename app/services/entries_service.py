@@ -86,7 +86,7 @@ async def list_entries_for_date(db: AsyncSession, user_id: UUID, target_date: da
             FoodEntry.user_id == user_id,
             func.date(FoodEntry.logged_at) == target_date,
         )
-        .order_by(FoodEntry.logged_at)
+        .order_by(FoodEntry.logged_at.desc())
     )
     result = await db.execute(stmt)
     return list(result.scalars().all())
