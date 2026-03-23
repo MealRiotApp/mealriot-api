@@ -30,7 +30,7 @@ async def get_pet_status(
     windows = await get_eating_windows_for_user(db, current_user.id)
     now_time = datetime.now().time()
     tod_state = get_time_of_day_state(now_time, windows)
-    message, msg_type = select_message(cal_pct, tod_state)
+    message, msg_type = select_message(cal_pct, tod_state, current_user.language)
 
     return PetStatusResponse(
         mood=mood,
@@ -149,6 +149,6 @@ async def get_message(
     windows = await get_eating_windows_for_user(db, current_user.id)
     now_time = datetime.now().time()
     tod_state = get_time_of_day_state(now_time, windows)
-    message, msg_type = select_message(cal_pct, tod_state)
+    message, msg_type = select_message(cal_pct, tod_state, current_user.language)
 
     return MessageResponse(message=message, message_type=msg_type, cached=False)
