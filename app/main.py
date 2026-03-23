@@ -4,6 +4,11 @@ from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 from app.core.config import get_settings
 from app.api import admin as admin_module
+from app.api import food as food_module
+from app.api import entries as entries_module
+from app.api import stats as stats_module
+from app.api import recent_foods as recent_foods_module
+from app.api import profile as profile_module
 
 settings = get_settings()
 
@@ -28,6 +33,11 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 
 app.include_router(admin_module.router)
+app.include_router(food_module.router)
+app.include_router(entries_module.router)
+app.include_router(stats_module.router)
+app.include_router(recent_foods_module.router)
+app.include_router(profile_module.router)
 
 @app.get("/health")
 async def health():

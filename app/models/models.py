@@ -1,7 +1,7 @@
 import uuid
 import json
-from datetime import datetime
-from sqlalchemy import String, Integer, Numeric, Text, DateTime, JSON, func, UniqueConstraint
+from datetime import datetime, date as date_type
+from sqlalchemy import String, Integer, Numeric, Text, DateTime, JSON, Date, func, UniqueConstraint
 from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
@@ -51,6 +51,10 @@ class User(Base):
     weight_kg: Mapped[float | None] = mapped_column(Numeric(5, 2))
     height_cm: Mapped[float | None] = mapped_column(Numeric(5, 2))
     activity_level: Mapped[str | None] = mapped_column(String)
+    active_cat: Mapped[str] = mapped_column(String, nullable=False, default="whiskers")
+    current_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    longest_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_log_date: Mapped[date_type | None] = mapped_column(Date, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
