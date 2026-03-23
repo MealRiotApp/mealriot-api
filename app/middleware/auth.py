@@ -79,6 +79,14 @@ async def get_current_user(
         await db.commit()
         await db.refresh(user)
 
+        if status == "pending":
+            try:
+                from app.services.notification_service import notify_admin_new_user
+                import asyncio
+                asyncio.create_task(notify_admin_new_user(name, email))
+            except Exception:
+                pass
+
     if user.status == "pending":
         raise HTTPException(
             status_code=403,
