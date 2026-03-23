@@ -5,6 +5,7 @@ from fastapi.exceptions import HTTPException
 from app.core.config import get_settings
 from app.api import admin as admin_module
 from app.api import food as food_module
+from app.api import entries as entries_module
 
 settings = get_settings()
 
@@ -30,6 +31,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 app.include_router(admin_module.router)
 app.include_router(food_module.router)
+app.include_router(entries_module.router)
 
 @app.get("/health")
 async def health():
