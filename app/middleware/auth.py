@@ -10,20 +10,20 @@ from app.models.models import User
 _jwks_cache: dict | None = None
 
 
-def _get_jwks() -> dict:
+async def prefetch_jwks() -> None:
+    """Called once at app startup to warm the JWKS cache asynchronously."""
     global _jwks_cache
-    if _jwks_cache is None:
-        settings = get_settings()
-        url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
-        response = httpx.get(url, timeout=10)
+    settings = get_settings()
+    url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
+    async with httpx.AsyncClient() as client:
+        response = await client.get(url, timeout=10)
         response.raise_for_status()
         _jwks_cache = response.json()
-    return _jwks_cache
 
 
 def decode_jwt(token: str) -> dict:
     try:
-        jwks = _get_jwks()
+        jwks = _jwks_cache
         return jwt.decode(
             token,
             jwks,

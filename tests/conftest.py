@@ -1,10 +1,17 @@
 import pytest
 import pytest_asyncio
+from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.main import app
 from app.core.database import Base, get_db
 import uuid
+
+
+@pytest.fixture(autouse=True)
+def mock_prefetch_jwks():
+    with patch("app.middleware.auth.prefetch_jwks", new_callable=AsyncMock):
+        yield
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///:memory:"
 

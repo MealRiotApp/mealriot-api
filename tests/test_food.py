@@ -61,6 +61,26 @@ async def test_parse_text_requires_auth(client, db):
     assert resp.status_code == 401
 
 
+async def test_parse_image(client, db):
+    user, sid = await make_active_user(db)
+
+    with patch("app.middleware.auth.decode_jwt",
+               return_value=make_jwt_payload(user.email, supabase_id=sid)):
+        with patch("app.api.food.parse_food_image", new_callable=AsyncMock,
+                   return_value=MOCK_ITEMS):
+            with patch("app.api.food.asyncio.to_thread", new_callable=AsyncMock,
+                       return_value="https://example.com/food.jpg"):
+                resp = await client.post(
+                    "/api/v1/food/parse-image",
+                    files={"image": ("food.jpg", b"fakejpeg", "image/jpeg")},
+                    headers={"Authorization": "Bearer faketoken"},
+                )
+
+    assert resp.status_code == 200
+    assert resp.json()["image_url"] == "https://example.com/food.jpg"
+    assert resp.json()["items"][0]["food_name"] == "Bread"
+
+
 async def test_parse_image_wrong_mime_rejected(client, db):
     user, sid = await make_active_user(db)
 

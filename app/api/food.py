@@ -1,5 +1,9 @@
+import asyncio
+import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from supabase import create_client
 from app.api.deps import require_active_user
+from app.core.config import get_settings
 from app.models.models import User
 from app.schemas.food import ParseTextRequest, ParseTextResponse, ParseImageResponse, BarcodeResponse
 from app.services.ai_service import parse_food_text, parse_food_image
@@ -9,6 +13,16 @@ router = APIRouter(prefix="/api/v1/food", tags=["food"])
 
 ALLOWED_MIME_TYPES = {"image/jpeg", "image/png", "image/webp"}
 MAX_IMAGE_BYTES = 10 * 1024 * 1024  # 10MB
+
+_sb = None
+
+
+def _get_sb():
+    global _sb
+    if _sb is None:
+        settings = get_settings()
+        _sb = create_client(settings.supabase_url, settings.supabase_service_key)
+    return _sb
 
 
 @router.post("/parse-text", response_model=ParseTextResponse)
@@ -23,6 +37,14 @@ async def parse_text_route(
         )
     items = await parse_food_text(body.text)
     return ParseTextResponse(items=items)
+
+
+def _upload_and_sign(path: str, image_bytes: bytes, content_type: str) -> str:
+    """Sync Supabase storage calls — run in thread via asyncio.to_thread."""
+    sb = _get_sb()
+    sb.storage.from_("food-images").upload(path, image_bytes, {"content-type": content_type})
+    signed = sb.storage.from_("food-images").create_signed_url(path, 60 * 60 * 24 * 365)
+    return signed["signedURL"]
 
 
 @router.post("/parse-image", response_model=ParseImageResponse)
@@ -43,18 +65,9 @@ async def parse_image_route(
             detail={"error": {"code": "INVALID_IMAGE", "message": "Image too large (max 10MB)"}},
         )
 
-    from app.core.config import get_settings
-    from supabase import create_client
-    import uuid
-
-    settings = get_settings()
-    sb = create_client(settings.supabase_url, settings.supabase_service_key)
     ext = image.content_type.split("/")[1]
     path = f"{current_user.id}/{uuid.uuid4()}.{ext}"
-    sb.storage.from_("food-images").upload(path, image_bytes,
-                                           {"content-type": image.content_type})
-    signed = sb.storage.from_("food-images").create_signed_url(path, 60 * 60 * 24 * 365)
-    image_url = signed["signedURL"]
+    image_url = await asyncio.to_thread(_upload_and_sign, path, image_bytes, image.content_type)
 
     items = await parse_food_image(image_bytes, image.content_type)
     return ParseImageResponse(image_url=image_url, items=items)

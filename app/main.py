@@ -1,8 +1,10 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
 from app.core.config import get_settings
+from app.middleware.auth import prefetch_jwks
 from app.api import admin as admin_module
 from app.api import food as food_module
 from app.api import entries as entries_module
@@ -12,7 +14,14 @@ from app.api import profile as profile_module
 
 settings = get_settings()
 
-app = FastAPI(title="NutriLog API", version="1.0.0")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    await prefetch_jwks()
+    yield
+
+
+app = FastAPI(title="NutriLog API", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
