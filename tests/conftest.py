@@ -39,3 +39,18 @@ def make_jwt_payload(email: str, supabase_id: str | None = None) -> dict:
         "email": email,
         "user_metadata": {"full_name": "Test User", "avatar_url": None},
     }
+
+
+async def make_active_user(db, email="user@test.com", role="member"):
+    from app.models.models import User
+    sid = str(uuid.uuid4())
+    user = User(
+        supabase_id=sid, email=email, name="Test User",
+        role=role, status="active",
+        daily_cal_goal=2000, daily_protein_goal_g=120,
+        daily_fat_goal_g=78, daily_carbs_goal_g=180,
+    )
+    db.add(user)
+    await db.commit()
+    await db.refresh(user)
+    return user, sid
