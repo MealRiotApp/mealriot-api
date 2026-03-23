@@ -64,6 +64,7 @@ class User(Base):
     daily_summary: Mapped[str | None] = mapped_column(Text)
     summary_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     onboarding_done: Mapped[bool] = mapped_column(default=False)
+    use_24h: Mapped[bool] = mapped_column(default=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

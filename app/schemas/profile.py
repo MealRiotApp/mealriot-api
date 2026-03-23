@@ -22,6 +22,7 @@ class ProfileOut(BaseModel):
     daily_water_goal_ml: int
     goal_weight_kg: float | None
     onboarding_done: bool
+    use_24h: bool
     current_streak: int
     longest_streak: int
     model_config = {"from_attributes": True}
@@ -40,3 +41,4 @@ class ProfileUpdate(BaseModel):
     height_cm: float | None = None
     activity_level: str | None = None
     goal_weight_kg: float | None = None
+    use_24h: bool | None = None
