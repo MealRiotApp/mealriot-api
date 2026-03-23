@@ -23,7 +23,7 @@ async def get_daily_stats(db: AsyncSession, user: User, target_date: date) -> di
             FoodEntry.user_id == user.id,
             func.date(FoodEntry.logged_at) == target_date,
         )
-        .order_by(FoodEntry.logged_at)
+        .order_by(FoodEntry.logged_at.desc())
     )
     entries = list((await db.execute(entries_stmt)).scalars().all())
 

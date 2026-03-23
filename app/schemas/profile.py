@@ -24,6 +24,7 @@ class ProfileOut(BaseModel):
     goal_weight_kg: float | None
     onboarding_done: bool
     use_24h: bool
+    first_day_of_week: int
     current_streak: int
     longest_streak: int
     model_config = {"from_attributes": True}
@@ -43,3 +44,4 @@ class ProfileUpdate(BaseModel):
     activity_level: str | None = None
     goal_weight_kg: float | None = None
     use_24h: bool | None = None
+    first_day_of_week: int | None = None
