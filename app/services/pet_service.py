@@ -162,11 +162,19 @@ def select_message(calorie_pct: float, tod_state: str, lang: str = "en") -> tupl
 
 # --- Streak logic ---
 async def update_streak_on_entry(db: AsyncSession, user: User, today: date) -> None:
-    if user.last_log_date == today:
+    # Normalize to date in case a datetime was passed
+    if hasattr(today, "date"):
+        today = today.date()
+    last = user.last_log_date
+    if hasattr(last, "date"):
+        last = last.date()
+    else:
+        last = user.last_log_date
+    if last == today:
         return
-    if user.last_log_date and (today - user.last_log_date).days == 1:
+    if last and (today - last).days == 1:
         user.current_streak += 1
-    elif user.last_log_date and (today - user.last_log_date).days > 1:
+    elif last and (today - last).days > 1:
         user.current_streak = 1
     else:
         user.current_streak = 1
