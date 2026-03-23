@@ -1,6 +1,8 @@
+import random
 from datetime import date
 from uuid import UUID
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_active_user
 from app.core.database import get_db
@@ -10,14 +12,38 @@ from app.services.entries_service import create_entry, list_entries_for_date, up
 
 router = APIRouter(prefix="/api/v1/entries", tags=["entries"])
 
+PET_REACTIONS = {
+    "en": [
+        "Yum! Logged it 🐾",
+        "Got it! Keep going",
+        "Nice choice 😺",
+        "Noted! Looking good today",
+        "Added to the log ✓",
+    ],
+    "he": [
+        "יאמי! תועד 🐾",
+        "קיבלתי! תמשיך ככה",
+        "בחירה טובה 😺",
+        "תועד! נראה טוב היום",
+        "נוסף ליומן ✓",
+    ],
+}
 
-@router.post("", response_model=EntryOut, status_code=201)
+
+@router.post("", status_code=201)
 async def create(
     body: EntryCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
-    return await create_entry(db, current_user, body.model_dump())
+    entry = await create_entry(db, current_user, body.model_dump())
+    lang = current_user.language or "en"
+    reactions = PET_REACTIONS.get(lang, PET_REACTIONS["en"])
+    reaction = random.choice(reactions)
+
+    entry_data = EntryOut.model_validate(entry).model_dump(mode="json")
+    entry_data["pet_reaction"] = reaction
+    return JSONResponse(status_code=201, content=entry_data)
 
 
 @router.get("", response_model=EntriesListResponse)
