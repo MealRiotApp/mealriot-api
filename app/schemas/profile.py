@@ -7,6 +7,8 @@ class ProfileOut(BaseModel):
     email: str
     name: str
     avatar_url: str | None
+    role: str
+    username: str | None
     language: str
     theme: str
     daily_cal_goal: int | None
