@@ -32,7 +32,7 @@ Rules:
 - Convert portion descriptions (slice, cup, פרוסה) to grams using standard measures.
 - Use USDA as your reference.
 - When uncertain, lean conservative.
-- Always return a JSON array, even for a single item.
+- Always return a JSON object with an "items" key containing the array.
 - Never include text outside the JSON."""
 
 _IMAGE_SYSTEM = """You are a precise food vision analyst. You MUST respond with valid JSON only.
@@ -49,15 +49,22 @@ Flag confidence as "low" if items are obscured, stacked, or ambiguous."""
 
 def _parse_json_response(content: str) -> list[dict]:
     try:
-        result = json.loads(content)
+        # Strip markdown code fences GPT sometimes wraps around JSON
+        text = content.strip()
+        if text.startswith("```"):
+            text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+            text = text.rsplit("```", 1)[0]
+        result = json.loads(text.strip())
+        if isinstance(result, dict) and "items" in result:
+            result = result["items"]
         if isinstance(result, list):
             return result
         raise ValueError("Expected JSON array")
-    except (json.JSONDecodeError, ValueError):
+    except (json.JSONDecodeError, ValueError) as e:
         raise HTTPException(
             status_code=500,
             detail={"error": {"code": "AI_PARSE_FAILED",
-                              "message": "AI returned invalid JSON"}},
+                              "message": f"AI returned invalid JSON: {str(e)[:100]}"}},
         )
 
 
@@ -70,6 +77,7 @@ async def parse_food_text(text: str) -> list[dict]:
             {"role": "user", "content": text},
         ],
         temperature=0,
+        response_format={"type": "json_object"},
     )
     return _parse_json_response(response.choices[0].message.content)
 
