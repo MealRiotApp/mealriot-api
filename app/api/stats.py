@@ -1,5 +1,5 @@
 from datetime import date
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_active_user
 from app.core.database import get_db
@@ -26,4 +26,8 @@ async def range_stats(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
+    if end < start:
+        raise HTTPException(status_code=400, detail="end must be >= start")
+    if (end - start).days > 366:
+        raise HTTPException(status_code=400, detail="Range cannot exceed 366 days")
     return await get_range_stats(db, current_user, start, end)
