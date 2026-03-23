@@ -9,6 +9,7 @@ class ProfileOut(BaseModel):
     avatar_url: str | None
     role: str
     username: str | None
+    friend_code: str | None
     language: str
     theme: str
     daily_cal_goal: int | None
