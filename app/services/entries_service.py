@@ -71,6 +71,9 @@ async def create_entry(db: AsyncSession, user: User, data: dict) -> FoodEntry:
     db.add(entry)
     await db.flush()
     await _upsert_recent_foods(db, user.id, items)
+    from app.services.pet_service import update_streak_on_entry
+    today = (logged_at if isinstance(logged_at, date) else logged_at.date()) if logged_at else date.today()
+    await update_streak_on_entry(db, user, today)
     await db.commit()
     await db.refresh(entry)
     return entry

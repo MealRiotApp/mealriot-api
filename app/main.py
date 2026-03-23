@@ -11,6 +11,7 @@ from app.api import entries as entries_module
 from app.api import stats as stats_module
 from app.api import recent_foods as recent_foods_module
 from app.api import profile as profile_module
+from app.api import pet as pet_module
 
 settings = get_settings()
 
@@ -47,6 +48,7 @@ app.include_router(entries_module.router)
 app.include_router(stats_module.router)
 app.include_router(recent_foods_module.router)
 app.include_router(profile_module.router)
+app.include_router(pet_module.router)
 
 @app.get("/health")
 async def health():
