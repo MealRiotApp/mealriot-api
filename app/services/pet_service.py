@@ -55,67 +55,109 @@ def get_time_of_day_state(now_time: time, windows: list[dict]) -> str:
 
 # --- Static message banks ---
 MESSAGES = {
-    "GOOD_PROGRESS": [
-        "Looking solid today 🐾",
-        "You're doing really well — keep it going",
-        "Nice work today. Almost there",
-        "The macros are looking good. Dinner should be easy",
-        "Consistent day. This is how it's done",
-        "On track. Nothing to stress about",
-    ],
-    "OVER_GOAL": [
-        "Went a bit over today — happens to everyone",
-        "Today was a hungry day. That's okay",
-        "Over the goal, but tomorrow is fresh",
-        "Bodies need different things on different days 🐱",
-    ],
-    "NEUTRAL": [
-        "Still some room in the day — no rush",
-        "Day's going fine. Just keep logging",
-        "You've got this. One meal at a time",
-        "Progress is progress 🐾",
-    ],
-    "LATE_NIGHT": [
-        "Rest up. Tomorrow's a fresh start",
-        "Today was what it was. See you tomorrow",
-        "Not every day gets logged and that's okay",
-    ],
-    "DEEP_NIGHT": [
-        "Still up? Rest well.",
-        "Late night. See you in the morning.",
-        "Sleep tight.",
-    ],
-    "EARLY_MORNING": [
-        "Good morning. Breakfast window opens soon",
-        "Still waking up... breakfast is almost here",
-        "Ready when you are",
-    ],
+    "en": {
+        "GOOD_PROGRESS": [
+            "Looking solid today 🐾",
+            "You're doing really well — keep it going",
+            "Nice work today. Almost there",
+            "The macros are looking good. Dinner should be easy",
+            "Consistent day. This is how it's done",
+            "On track. Nothing to stress about",
+        ],
+        "OVER_GOAL": [
+            "Went a bit over today — happens to everyone",
+            "Today was a hungry day. That's okay",
+            "Over the goal, but tomorrow is fresh",
+            "Bodies need different things on different days 🐱",
+        ],
+        "NEUTRAL": [
+            "Still some room in the day — no rush",
+            "Day's going fine. Just keep logging",
+            "You've got this. One meal at a time",
+            "Progress is progress 🐾",
+        ],
+        "LATE_NIGHT": [
+            "Rest up. Tomorrow's a fresh start",
+            "Today was what it was. See you tomorrow",
+            "Not every day gets logged and that's okay",
+        ],
+        "DEEP_NIGHT": [
+            "Still up? Rest well.",
+            "Late night. See you in the morning.",
+            "Sleep tight.",
+        ],
+        "EARLY_MORNING": [
+            "Good morning. Breakfast window opens soon",
+            "Still waking up... breakfast is almost here",
+            "Ready when you are",
+        ],
+    },
+    "he": {
+        "GOOD_PROGRESS": [
+            "יום מוצלח 🐾",
+            "אתה ממש בכיוון — תמשיך ככה",
+            "עבודה יפה היום. כמעט שם",
+            "המאקרו נראים טוב. ארוחת ערב תהיה קלה",
+            "יום עקבי. ככה עושים את זה",
+            "בכיוון. אין מה ללחוץ",
+        ],
+        "OVER_GOAL": [
+            "קצת מעל היעד היום — קורה לכולם",
+            "היום היה יום רעב. זה בסדר",
+            "מעל היעד, אבל מחר יום חדש",
+            "הגוף צריך דברים שונים בימים שונים 🐱",
+        ],
+        "NEUTRAL": [
+            "עוד יש מקום ביום — בלי לחץ",
+            "היום הולך בסדר. פשוט תמשיך לתעד",
+            "אתה מסתדר. ארוחה אחרי ארוחה",
+            "התקדמות זו התקדמות 🐾",
+        ],
+        "LATE_NIGHT": [
+            "תנוח. מחר התחלה חדשה",
+            "היום היה מה שהיה. נתראה מחר",
+            "לא כל יום מתועד וזה בסדר",
+        ],
+        "DEEP_NIGHT": [
+            "עדיין ער? תנוח טוב.",
+            "לילה מאוחר. נתראה בבוקר.",
+            "לילה טוב.",
+        ],
+        "EARLY_MORNING": [
+            "בוקר טוב. חלון ארוחת הבוקר נפתח בקרוב",
+            "עדיין מתעוררים... ארוחת בוקר כמעט כאן",
+            "מוכן כשאתה מוכן",
+        ],
+    },
 }
 
 _last_msg: dict[str, str] = {}
 
-def pick_message(pool: str) -> str:
-    msgs = MESSAGES[pool]
-    last = _last_msg.get(pool)
+
+def pick_message(pool: str, lang: str = "en") -> str:
+    bank = MESSAGES.get(lang, MESSAGES["en"])
+    msgs = bank.get(pool, MESSAGES["en"][pool])
+    key = f"{lang}:{pool}"
+    last = _last_msg.get(key)
     choices = [m for m in msgs if m != last] or msgs
     msg = random.choice(choices)
-    _last_msg[pool] = msg
+    _last_msg[key] = msg
     return msg
 
 
-def select_message(calorie_pct: float, tod_state: str) -> tuple[str, str]:
+def select_message(calorie_pct: float, tod_state: str, lang: str = "en") -> tuple[str, str]:
     """Returns (message, message_type)."""
     if tod_state in ("LATE_NIGHT",):
-        return pick_message("LATE_NIGHT"), "static"
+        return pick_message("LATE_NIGHT", lang), "static"
     if tod_state == "DEEP_NIGHT":
-        return pick_message("DEEP_NIGHT"), "static"
+        return pick_message("DEEP_NIGHT", lang), "static"
     if tod_state == "EARLY_MORNING":
-        return pick_message("EARLY_MORNING"), "static"
+        return pick_message("EARLY_MORNING", lang), "static"
     if calorie_pct > 1.0:
-        return pick_message("OVER_GOAL"), "static"
+        return pick_message("OVER_GOAL", lang), "static"
     if calorie_pct >= 0.7:
-        return pick_message("GOOD_PROGRESS"), "static"
-    return pick_message("NEUTRAL"), "static"
+        return pick_message("GOOD_PROGRESS", lang), "static"
+    return pick_message("NEUTRAL", lang), "static"
 
 
 # --- Streak logic ---
