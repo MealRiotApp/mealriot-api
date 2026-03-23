@@ -1,3 +1,4 @@
+import httpx
 from fastapi import HTTPException, Header, Depends
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,14 +7,27 @@ from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.models import User
 
+_jwks_cache: dict | None = None
+
+
+def _get_jwks() -> dict:
+    global _jwks_cache
+    if _jwks_cache is None:
+        settings = get_settings()
+        url = f"{settings.supabase_url}/auth/v1/.well-known/jwks.json"
+        response = httpx.get(url, timeout=10)
+        response.raise_for_status()
+        _jwks_cache = response.json()
+    return _jwks_cache
+
 
 def decode_jwt(token: str) -> dict:
-    settings = get_settings()
     try:
+        jwks = _get_jwks()
         return jwt.decode(
             token,
-            settings.supabase_jwt_secret,
-            algorithms=["HS256"],
+            jwks,
+            algorithms=["RS256", "ES256"],
             options={"verify_aud": False},
         )
     except JWTError:
