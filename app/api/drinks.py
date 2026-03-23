@@ -1,3 +1,4 @@
+import json
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -6,7 +7,6 @@ from sqlalchemy import select
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User, CustomDrink
-
 
 router = APIRouter(prefix="/api/v1/drinks", tags=["drinks"])
 
@@ -22,6 +22,7 @@ class DrinkCreate(BaseModel):
     fat_g: float = 0
     carbs_g: float = 0
     counts_as_water: bool = True
+    water_pct: int = 100
 
 
 class DrinkOut(BaseModel):
@@ -36,6 +37,24 @@ class DrinkOut(BaseModel):
     fat_g: float
     carbs_g: float
     counts_as_water: bool
+    water_pct: int
+
+
+class DrinkParseRequest(BaseModel):
+    text: str
+
+
+class DrinkParseResponse(BaseModel):
+    name: str
+    name_he: str
+    icon: str
+    volume_ml: int
+    calories: int
+    sugar_g: float
+    protein_g: float
+    fat_g: float
+    carbs_g: float
+    water_pct: int
 
 
 @router.get("", response_model=list[DrinkOut])
@@ -52,9 +71,69 @@ async def list_drinks(
             volume_ml=d.volume_ml, calories=d.calories, sugar_g=float(d.sugar_g),
             protein_g=float(d.protein_g), fat_g=float(d.fat_g),
             carbs_g=float(d.carbs_g), counts_as_water=d.counts_as_water,
+            water_pct=getattr(d, 'water_pct', 100) if hasattr(d, 'water_pct') else 100,
         )
         for d in result.scalars().all()
     ]
+
+
+@router.post("/parse", response_model=DrinkParseResponse)
+async def parse_drink(
+    body: DrinkParseRequest,
+    _current_user: User = Depends(require_active_user),
+):
+    """AI parses free text like 'beer 500ml' or 'tea with sugar 330ml' into drink data."""
+    from app.services.ai_service import _get_client
+
+    client = _get_client()
+    response = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": """You are a nutrition analyst for beverages. Parse the user's drink description.
+Return a JSON object with:
+- name: English name of the drink
+- name_he: Hebrew name of the drink
+- icon: single emoji that represents this drink (☕🍵🥤🍺🍷🧃🥛🧋🍶)
+- volume_ml: volume in milliliters
+- calories: total calories (integer)
+- sugar_g: sugar in grams (1 decimal)
+- protein_g: protein in grams (1 decimal)
+- fat_g: fat in grams (1 decimal)
+- carbs_g: total carbs in grams (1 decimal)
+- water_pct: percentage of the drink that counts as water intake (integer, 0-100)
+  For example: water=100, coffee/tea=95, beer=92, wine=85, juice=85, soda=90, milk=87
+
+Be precise with nutritional data. Use standard serving databases.
+If volume not specified, use standard serving size.
+Return ONLY the JSON object."""},
+            {"role": "user", "content": body.text},
+        ],
+        temperature=0,
+        response_format={"type": "json_object"},
+    )
+
+    content = response.choices[0].message.content or "{}"
+    text = content.strip()
+    if text.startswith("```"):
+        text = text.split("\n", 1)[1] if "\n" in text else text[3:]
+        text = text.rsplit("```", 1)[0]
+
+    try:
+        data = json.loads(text.strip())
+        return DrinkParseResponse(
+            name=data.get("name", "Drink"),
+            name_he=data.get("name_he", "משקה"),
+            icon=data.get("icon", "🥤"),
+            volume_ml=int(data.get("volume_ml", 250)),
+            calories=int(data.get("calories", 0)),
+            sugar_g=float(data.get("sugar_g", 0)),
+            protein_g=float(data.get("protein_g", 0)),
+            fat_g=float(data.get("fat_g", 0)),
+            carbs_g=float(data.get("carbs_g", 0)),
+            water_pct=int(data.get("water_pct", 100)),
+        )
+    except (json.JSONDecodeError, ValueError):
+        raise HTTPException(500, detail="Failed to parse drink")
 
 
 @router.post("", response_model=DrinkOut, status_code=201)
@@ -77,6 +156,7 @@ async def create_drink(
         volume_ml=drink.volume_ml, calories=drink.calories, sugar_g=float(drink.sugar_g),
         protein_g=float(drink.protein_g), fat_g=float(drink.fat_g),
         carbs_g=float(drink.carbs_g), counts_as_water=drink.counts_as_water,
+        water_pct=100,
     )
 
 
