@@ -60,6 +60,10 @@ class User(Base):
     macro_bonus_enabled: Mapped[bool] = mapped_column(default=True)
     timezone: Mapped[str] = mapped_column(String(50), nullable=False, default="UTC")
     daily_water_goal_ml: Mapped[int] = mapped_column(Integer, nullable=False, default=2000)
+    goal_weight_kg: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    daily_summary: Mapped[str | None] = mapped_column(Text)
+    summary_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    onboarding_done: Mapped[bool] = mapped_column(default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -227,3 +231,21 @@ class WeightLog(Base):
     __table_args__ = (
         UniqueConstraint("user_id", "date", name="uq_weight_logs_user_date"),
     )
+
+
+class CustomDrink(Base):
+    __tablename__ = "custom_drinks"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    name_he: Mapped[str | None] = mapped_column(String)
+    icon: Mapped[str] = mapped_column(String, nullable=False, default="☕")
+    volume_ml: Mapped[int] = mapped_column(Integer, nullable=False)
+    calories: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    sugar_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False, default=0)
+    protein_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False, default=0)
+    fat_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False, default=0)
+    carbs_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False, default=0)
+    counts_as_water: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

@@ -144,11 +144,40 @@ async def get_message(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
+    from app.services.summary_service import update_user_summary
+
     today = date.today()
     cal_pct = await get_daily_calorie_pct(db, current_user, today)
     windows = await get_eating_windows_for_user(db, current_user.id)
     now_time = datetime.now().time()
     tod_state = get_time_of_day_state(now_time, windows)
-    message, msg_type = select_message(cal_pct, tod_state, current_user.language)
 
+    # Try AI-powered message if summary is available and within eating windows
+    summary = await update_user_summary(db, current_user)
+    if summary and tod_state not in ("LATE_NIGHT", "DEEP_NIGHT", "EARLY_MORNING"):
+        try:
+            from app.services.ai_service import _get_client
+            lang = "Hebrew" if current_user.language == "he" else "English"
+            client = _get_client()
+            response = await client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": (
+                        "You are a warm, low-key cat companion in a calorie tracking app called NutriLog. "
+                        "Give the user ONE specific, actionable suggestion about their next meal based on their day so far. "
+                        "Rules: Max 1-2 sentences. Be specific to actual food data. Tone: friendly, casual. "
+                        "Never use 'great job' or 'well done'. Never guilt. Suggest specific food when possible. "
+                        f"Respond in {lang}."
+                    )},
+                    {"role": "user", "content": summary},
+                ],
+                temperature=0.7,
+                max_tokens=100,
+            )
+            ai_msg = response.choices[0].message.content.strip()
+            return MessageResponse(message=ai_msg, message_type="ai", cached=False)
+        except Exception:
+            pass
+
+    message, msg_type = select_message(cal_pct, tod_state, current_user.language)
     return MessageResponse(message=message, message_type=msg_type, cached=False)
