@@ -16,6 +16,8 @@ from app.api import friends as friends_module
 from app.api import groups as groups_module
 from app.api import points as points_module
 from app.api import jobs as jobs_module
+from app.api import water as water_module
+from app.api import weight as weight_module
 
 settings = get_settings()
 
@@ -57,6 +59,8 @@ app.include_router(friends_module.router)
 app.include_router(groups_module.router)
 app.include_router(points_module.router)
 app.include_router(jobs_module.router)
+app.include_router(water_module.router)
+app.include_router(weight_module.router)
 
 @app.get("/health")
 async def health():
