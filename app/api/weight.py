@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -15,6 +15,7 @@ class WeightLogRequest(BaseModel):
 
 
 class WeightEntry(BaseModel):
+    id: str | None = None
     date: str
     weight_kg: float
 
@@ -40,7 +41,8 @@ async def log_weight(
         log = WeightLog(user_id=current_user.id, date=today, weight_kg=body.weight_kg)
         db.add(log)
     await db.commit()
-    return WeightEntry(date=today.isoformat(), weight_kg=float(log.weight_kg))
+    await db.refresh(log)
+    return WeightEntry(id=str(log.id), date=today.isoformat(), weight_kg=float(log.weight_kg))
 
 
 @router.get("/history", response_model=WeightHistoryResponse)
@@ -48,7 +50,7 @@ async def get_weight_history(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
-    since = date.today() - timedelta(days=90)
+    since = date.today() - timedelta(days=365)
     result = await db.execute(
         select(WeightLog)
         .where(WeightLog.user_id == current_user.id, WeightLog.date >= since)
@@ -56,5 +58,22 @@ async def get_weight_history(
     )
     logs = result.scalars().all()
     return WeightHistoryResponse(
-        entries=[WeightEntry(date=l.date.isoformat(), weight_kg=float(l.weight_kg)) for l in logs]
+        entries=[WeightEntry(id=str(l.id), date=l.date.isoformat(), weight_kg=float(l.weight_kg)) for l in logs]
     )
+
+
+@router.delete("/{date_str}", status_code=204)
+async def delete_weight(
+    date_str: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    target = date.fromisoformat(date_str)
+    result = await db.execute(
+        select(WeightLog).where(WeightLog.user_id == current_user.id, WeightLog.date == target)
+    )
+    log = result.scalar_one_or_none()
+    if not log:
+        raise HTTPException(404, detail="Weight entry not found")
+    await db.delete(log)
+    await db.commit()

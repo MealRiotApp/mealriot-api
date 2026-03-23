@@ -1,4 +1,5 @@
-from fastapi import APIRouter, Depends
+from datetime import date
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_active_user
@@ -8,11 +9,14 @@ from app.services.summary_service import update_user_summary
 
 router = APIRouter(prefix="/api/v1/insight", tags=["insight"])
 
+MAX_USER_REFRESHES = 5
+
 
 class InsightResponse(BaseModel):
     summary: str
     suggestion: str
-    source: str  # "ai" | "static"
+    source: str
+    refreshes_left: int
 
 
 STATIC_SUGGESTIONS = {
@@ -29,16 +33,25 @@ STATIC_SUGGESTIONS = {
 }
 
 
+def _reset_if_new_day(user: User) -> None:
+    today = date.today().isoformat()
+    if user.insight_last_date != today:
+        user.insight_refreshes_today = 0
+        user.insight_last_date = today
+
+
 @router.get("/today", response_model=InsightResponse)
 async def get_daily_insight(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
+    _reset_if_new_day(current_user)
+    refreshes_left = max(0, MAX_USER_REFRESHES - (current_user.insight_refreshes_today or 0))
+
     summary = await update_user_summary(db, current_user)
     if not summary:
         summary = "No data yet for today."
 
-    # Try AI suggestion
     try:
         from app.services.ai_service import _get_client
         lang = "Hebrew" if current_user.language == "he" else "English"
@@ -59,9 +72,58 @@ async def get_daily_insight(
             max_tokens=100,
         )
         suggestion = response.choices[0].message.content.strip()
-        return InsightResponse(summary=summary, suggestion=suggestion, source="ai")
+        await db.commit()
+        return InsightResponse(summary=summary, suggestion=suggestion, source="ai", refreshes_left=refreshes_left)
     except Exception:
         import random
         lang = current_user.language or "en"
         pool = STATIC_SUGGESTIONS.get(lang, STATIC_SUGGESTIONS["en"])
-        return InsightResponse(summary=summary, suggestion=random.choice(pool), source="static")
+        await db.commit()
+        return InsightResponse(summary=summary, suggestion=random.choice(pool), source="static", refreshes_left=refreshes_left)
+
+
+@router.post("/refresh", response_model=InsightResponse)
+async def refresh_insight(
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    _reset_if_new_day(current_user)
+
+    if (current_user.insight_refreshes_today or 0) >= MAX_USER_REFRESHES:
+        raise HTTPException(429, detail={"error": {"code": "REFRESH_LIMIT", "message": "Daily refresh limit reached"}})
+
+    current_user.insight_refreshes_today = (current_user.insight_refreshes_today or 0) + 1
+    refreshes_left = max(0, MAX_USER_REFRESHES - current_user.insight_refreshes_today)
+
+    summary = await update_user_summary(db, current_user)
+    if not summary:
+        summary = "No data yet for today."
+
+    try:
+        from app.services.ai_service import _get_client
+        lang = "Hebrew" if current_user.language == "he" else "English"
+        client = _get_client()
+        response = await client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": (
+                    "You are a nutrition coach for a calorie tracking app. "
+                    "Based on the user's day summary, give ONE specific, actionable tip for their next meal or the rest of the day. "
+                    "Max 2 sentences. Be specific to what they ate. Friendly and encouraging tone. "
+                    "Never say 'great job'. Never guilt. "
+                    f"Respond in {lang}."
+                )},
+                {"role": "user", "content": summary},
+            ],
+            temperature=0.8,
+            max_tokens=100,
+        )
+        suggestion = response.choices[0].message.content.strip()
+        await db.commit()
+        return InsightResponse(summary=summary, suggestion=suggestion, source="ai", refreshes_left=refreshes_left)
+    except Exception:
+        import random
+        lang = current_user.language or "en"
+        pool = STATIC_SUGGESTIONS.get(lang, STATIC_SUGGESTIONS["en"])
+        await db.commit()
+        return InsightResponse(summary=summary, suggestion=random.choice(pool), source="static", refreshes_left=refreshes_left)

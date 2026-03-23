@@ -65,6 +65,9 @@ class User(Base):
     summary_updated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     onboarding_done: Mapped[bool] = mapped_column(default=False)
     use_24h: Mapped[bool] = mapped_column(default=True)
+    first_day_of_week: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 0=Sunday, 1=Monday
+    insight_refreshes_today: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    insight_last_date: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
