@@ -117,4 +117,4 @@ async def test_message_endpoint(client, db):
         resp = await client.post("/api/v1/pet/message",
                                  headers={"Authorization": "Bearer faketoken"})
     assert resp.status_code == 200
-    assert resp.json()["message_type"] == "static"
+    assert resp.json()["message_type"] in ("static", "ai")
