@@ -11,6 +11,7 @@ class Settings(BaseSettings):
     openai_api_key: str
     admin_email: str
     frontend_url: str = "http://localhost:5173"
+    internal_secret: str = "dev-internal-secret"
 
 
 @lru_cache

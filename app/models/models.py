@@ -55,6 +55,10 @@ class User(Base):
     current_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     longest_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_log_date: Mapped[date_type | None] = mapped_column(Date, nullable=True)
+    username: Mapped[str | None] = mapped_column(String(30), unique=True, nullable=True)
+    friend_code: Mapped[str | None] = mapped_column(String(10), unique=True, nullable=True)
+    macro_bonus_enabled: Mapped[bool] = mapped_column(default=True)
+    timezone: Mapped[str] = mapped_column(String(50), nullable=False, default="UTC")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
@@ -122,4 +126,76 @@ class EatingWindow(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "meal_type", name="uq_eating_windows_user_meal"),
+    )
+
+
+class Friendship(Base):
+    __tablename__ = "friendships"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    requester_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    addressee_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("requester_id", "addressee_id", name="uq_friendships_pair"),
+    )
+
+
+class CompetitionGroup(Base):
+    __tablename__ = "competition_groups"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    name: Mapped[str] = mapped_column(String(60), nullable=False)
+    created_by: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id"), nullable=False)
+    is_active: Mapped[bool] = mapped_column(default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class CompetitionMember(Base):
+    __tablename__ = "competition_members"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    group_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("competition_groups.id", ondelete="CASCADE"), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    joined_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("group_id", "user_id", name="uq_competition_members_pair"),
+    )
+
+
+class DailyPoints(Base):
+    __tablename__ = "daily_points"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    date: Mapped[date_type] = mapped_column(Date, nullable=False)
+    calorie_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    logging_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    macro_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    total_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "date", name="uq_daily_points_user_date"),
+    )
+
+
+class WeeklySummary(Base):
+    __tablename__ = "weekly_summaries"
+
+    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    group_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("competition_groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    week_start: Mapped[date_type] = mapped_column(Date, nullable=False)
+    total_points: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    rank: Mapped[int | None] = mapped_column(Integer)
+    winner: Mapped[bool] = mapped_column(default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+    __table_args__ = (
+        UniqueConstraint("user_id", "group_id", "week_start", name="uq_weekly_summary"),
     )
