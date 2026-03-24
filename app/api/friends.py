@@ -133,6 +133,22 @@ async def respond_to_request(
     return {"status": f.status}
 
 
+@router.get("/suggest")
+async def suggest_users(
+    q: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    if len(q) < 2:
+        return {"results": []}
+    result = await db.execute(
+        select(User.username)
+        .where(User.username.ilike(f"{q}%"), User.id != current_user.id)
+        .limit(10)
+    )
+    return {"results": [r[0] for r in result.all() if r[0]]}
+
+
 @router.get("/search")
 async def search_user(
     username: str,
