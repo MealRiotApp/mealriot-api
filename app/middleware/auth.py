@@ -47,6 +47,22 @@ async def get_current_user(
             detail={"error": {"code": "UNAUTHORIZED", "message": "Missing bearer token"}},
         )
     token = authorization.split(" ", 1)[1]
+
+    # Dev token bypass — only works when DEV_MODE=true
+    if token.startswith("dev-"):
+        settings = get_settings()
+        if getattr(settings, "dev_mode", False):
+            supabase_id = token[4:]  # strip "dev-" prefix
+            result = await db.execute(select(User).where(User.supabase_id == supabase_id))
+            user = result.scalar_one_or_none()
+            if user:
+                if user.status == "pending":
+                    raise HTTPException(403, detail={"error": {"code": "PENDING_APPROVAL", "message": "Waiting for approval"}})
+                if user.status == "suspended":
+                    raise HTTPException(403, detail={"error": {"code": "SUSPENDED", "message": "Account suspended"}})
+                return user
+        raise HTTPException(401, detail={"error": {"code": "UNAUTHORIZED", "message": "Invalid dev token"}})
+
     payload = decode_jwt(token)
 
     supabase_id = payload.get("sub")

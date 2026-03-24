@@ -12,6 +12,7 @@ class Settings(BaseSettings):
     admin_email: str
     frontend_url: str = "http://localhost:5173"
     internal_secret: str = "dev-internal-secret"
+    dev_mode: bool = False
     smtp_host: str | None = None
     smtp_user: str | None = None
     smtp_pass: str | None = None

@@ -51,6 +51,10 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(status_code=exc.status_code, content={"detail": detail})
 
 
+if settings.dev_mode:
+    from app.api import dev_auth as dev_auth_module
+    app.include_router(dev_auth_module.router)
+
 app.include_router(admin_module.router)
 app.include_router(food_module.router)
 app.include_router(entries_module.router)
