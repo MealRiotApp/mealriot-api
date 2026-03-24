@@ -141,9 +141,23 @@ async def suggest_users(
 ):
     if len(q) < 2:
         return {"results": []}
+    blocked_ids = select(Friendship.requester_id).where(
+        Friendship.addressee_id == current_user.id,
+        Friendship.status == "blocked",
+    ).union(
+        select(Friendship.addressee_id).where(
+            Friendship.requester_id == current_user.id,
+            Friendship.status == "blocked",
+        )
+    )
     result = await db.execute(
         select(User.username)
-        .where(User.username.ilike(f"{q}%"), User.id != current_user.id)
+        .where(
+            User.username.isnot(None),
+            User.username.ilike(f"{q}%"),
+            User.id != current_user.id,
+            User.id.notin_(blocked_ids),
+        )
         .limit(10)
     )
     return {"results": [r[0] for r in result.all() if r[0]]}
