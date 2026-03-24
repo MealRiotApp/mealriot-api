@@ -252,4 +252,5 @@ class CustomDrink(Base):
     fat_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False, default=0)
     carbs_g: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False, default=0)
     counts_as_water: Mapped[bool] = mapped_column(default=True)
+    water_pct: Mapped[int] = mapped_column(Integer, nullable=False, default=100)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())

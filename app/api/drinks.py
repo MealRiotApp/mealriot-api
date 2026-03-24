@@ -71,7 +71,7 @@ async def list_drinks(
             volume_ml=d.volume_ml, calories=d.calories, sugar_g=float(d.sugar_g),
             protein_g=float(d.protein_g), fat_g=float(d.fat_g),
             carbs_g=float(d.carbs_g), counts_as_water=d.counts_as_water,
-            water_pct=getattr(d, 'water_pct', 100) if hasattr(d, 'water_pct') else 100,
+            water_pct=d.water_pct,
         )
         for d in result.scalars().all()
     ]
@@ -147,6 +147,7 @@ async def create_drink(
         icon=body.icon, volume_ml=body.volume_ml, calories=body.calories,
         sugar_g=body.sugar_g, protein_g=body.protein_g, fat_g=body.fat_g,
         carbs_g=body.carbs_g, counts_as_water=body.counts_as_water,
+        water_pct=body.water_pct,
     )
     db.add(drink)
     await db.commit()
@@ -156,7 +157,7 @@ async def create_drink(
         volume_ml=drink.volume_ml, calories=drink.calories, sugar_g=float(drink.sugar_g),
         protein_g=float(drink.protein_g), fat_g=float(drink.fat_g),
         carbs_g=float(drink.carbs_g), counts_as_water=drink.counts_as_water,
-        water_pct=100,
+        water_pct=drink.water_pct,
     )
 
 

@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_active_user
 from app.core.database import get_db
@@ -12,12 +12,40 @@ class GoalCalculateRequest(BaseModel):
     weight_kg: float
     height_cm: float
     age: int
-    sex: str  # "male" | "female"
-    activity_level: str  # sedentary | light | moderate | active | very_active
-    goal: str  # aggressive_loss | moderate_loss | mild_loss | maintain | mild_gain | moderate_gain
+    sex: str
+    activity_level: str
+    goal: str
     goal_weight_kg: float | None = None
-    body_fat_pct: float | None = None  # Optional for Katch-McArdle
-    macro_preset: str = "balanced"  # balanced | high_protein | keto | custom
+    body_fat_pct: float | None = None
+    macro_preset: str = "balanced"
+
+    @field_validator("weight_kg")
+    @classmethod
+    def weight_range(cls, v: float) -> float:
+        if v < 20 or v > 400:
+            raise ValueError("Weight must be between 20 and 400 kg")
+        return v
+
+    @field_validator("height_cm")
+    @classmethod
+    def height_range(cls, v: float) -> float:
+        if v < 80 or v > 280:
+            raise ValueError("Height must be between 80 and 280 cm")
+        return v
+
+    @field_validator("age")
+    @classmethod
+    def age_range(cls, v: int) -> int:
+        if v < 10 or v > 120:
+            raise ValueError("Age must be between 10 and 120")
+        return v
+
+    @field_validator("body_fat_pct")
+    @classmethod
+    def body_fat_range(cls, v: float | None) -> float | None:
+        if v is not None and (v < 3 or v > 60):
+            raise ValueError("Body fat must be between 3% and 60%")
+        return v
 
 
 class GoalCalculateResponse(BaseModel):
