@@ -14,8 +14,10 @@ class GoalCalculateRequest(BaseModel):
     age: int
     sex: str  # "male" | "female"
     activity_level: str  # sedentary | light | moderate | active | very_active
-    goal: str  # lose | maintain | gain
+    goal: str  # aggressive_loss | moderate_loss | mild_loss | maintain | mild_gain | moderate_gain
     goal_weight_kg: float | None = None
+    body_fat_pct: float | None = None  # Optional for Katch-McArdle
+    macro_preset: str = "balanced"  # balanced | high_protein | keto | custom
 
 
 class GoalCalculateResponse(BaseModel):
@@ -26,6 +28,7 @@ class GoalCalculateResponse(BaseModel):
     daily_water_goal_ml: int
     bmr: int
     tdee: int
+    formula_used: str
 
 
 ACTIVITY_MULTIPLIERS = {
@@ -36,11 +39,61 @@ ACTIVITY_MULTIPLIERS = {
     "very_active": 1.9,
 }
 
+# 6 goal options with calorie adjustments
 GOAL_ADJUSTMENTS = {
-    "lose": -500,
+    "aggressive_loss": -1000,
+    "moderate_loss": -500,
+    "mild_loss": -250,
     "maintain": 0,
-    "gain": 300,
+    "mild_gain": 250,
+    "moderate_gain": 500,
 }
+
+# Protein g/kg by goal (protein-first method)
+PROTEIN_PER_KG = {
+    "aggressive_loss": 2.0,
+    "moderate_loss": 1.8,
+    "mild_loss": 1.6,
+    "maintain": 1.4,
+    "mild_gain": 1.6,
+    "moderate_gain": 1.8,
+}
+
+
+def _mifflin_st_jeor(weight_kg: float, height_cm: float, age: int, sex: str) -> float:
+    if sex == "male":
+        return 10 * weight_kg + 6.25 * height_cm - 5 * age + 5
+    return 10 * weight_kg + 6.25 * height_cm - 5 * age - 161
+
+
+def _katch_mcardle(weight_kg: float, body_fat_pct: float) -> float:
+    lean_mass = weight_kg * (1 - body_fat_pct / 100)
+    return 370 + (21.6 * lean_mass)
+
+
+def _calc_macros_protein_first(daily_cal: int, weight_kg: float, goal: str, preset: str) -> tuple[int, int, int]:
+    """Protein-first method: set protein in g/kg, fat as %, carbs fill remainder."""
+    if preset == "keto":
+        protein_g = round(weight_kg * 1.6)
+        fat_cal = daily_cal * 0.70
+        fat_g = round(fat_cal / 9)
+        carbs_g = max(20, round((daily_cal - protein_g * 4 - fat_g * 9) / 4))
+        return protein_g, fat_g, carbs_g
+
+    if preset == "high_protein":
+        protein_g = round(weight_kg * 2.2)
+        fat_g = round(daily_cal * 0.25 / 9)
+        carbs_g = max(50, round((daily_cal - protein_g * 4 - fat_g * 9) / 4))
+        return protein_g, fat_g, carbs_g
+
+    # balanced (default) — protein-first
+    protein_per_kg = PROTEIN_PER_KG.get(goal, 1.4)
+    protein_g = round(weight_kg * protein_per_kg)
+    fat_g = round(daily_cal * 0.25 / 9)
+    remaining_cal = daily_cal - (protein_g * 4) - (fat_g * 9)
+    carbs_g = max(50, round(remaining_cal / 4))
+
+    return protein_g, fat_g, carbs_g
 
 
 @router.post("/calculate", response_model=GoalCalculateResponse)
@@ -49,26 +102,35 @@ async def calculate_goals(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
-    # Mifflin-St Jeor BMR
-    if body.sex == "male":
-        bmr = 10 * body.weight_kg + 6.25 * body.height_cm - 5 * body.age + 5
+    # Choose formula
+    if body.body_fat_pct and body.body_fat_pct > 0:
+        bmr = _katch_mcardle(body.weight_kg, body.body_fat_pct)
+        formula_used = "katch_mcardle"
     else:
-        bmr = 10 * body.weight_kg + 6.25 * body.height_cm - 5 * body.age - 161
+        bmr = _mifflin_st_jeor(body.weight_kg, body.height_cm, body.age, body.sex)
+        formula_used = "mifflin_st_jeor"
 
+    # TDEE
     multiplier = ACTIVITY_MULTIPLIERS.get(body.activity_level, 1.55)
     tdee = round(bmr * multiplier)
+
+    # Calorie target with goal adjustment
     adjustment = GOAL_ADJUSTMENTS.get(body.goal, 0)
-    daily_cal = max(1200, tdee + adjustment)
+    daily_cal_raw = tdee + adjustment
 
-    # Macro split: 30% protein, 25% fat, 45% carbs
-    protein_g = round(daily_cal * 0.30 / 4)
-    fat_g = round(daily_cal * 0.25 / 9)
-    carbs_g = round(daily_cal * 0.45 / 4)
+    # Sex-specific safety floor
+    min_cal = 1500 if body.sex == "male" else 1200
+    daily_cal = max(min_cal, daily_cal_raw)
 
-    # Water: 30ml per kg body weight, min 1500
-    water_ml = max(1500, round(body.weight_kg * 30 / 100) * 100)
+    # Macros — protein-first method
+    protein_g, fat_g, carbs_g = _calc_macros_protein_first(
+        daily_cal, body.weight_kg, body.goal, body.macro_preset
+    )
 
-    # Save to user profile
+    # Water: 33ml per kg, rounded to nearest 100, min 1500
+    water_ml = max(1500, round(body.weight_kg * 33 / 100) * 100)
+
+    # Save to profile
     current_user.weight_kg = body.weight_kg
     current_user.height_cm = body.height_cm
     current_user.age = body.age
@@ -90,4 +152,5 @@ async def calculate_goals(
         daily_water_goal_ml=water_ml,
         bmr=round(bmr),
         tdee=tdee,
+        formula_used=formula_used,
     )
