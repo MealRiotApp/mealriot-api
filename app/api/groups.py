@@ -139,6 +139,7 @@ async def get_leaderboard(
         standings.append({
             "user_id": str(m.user_id),
             "name": user.name if user else "Unknown",
+            "username": user.username if user else None,
             "total_points": total_pts,
             "days_logged": days_logged,
             "days_in_week": days_in_week,
@@ -179,6 +180,7 @@ async def get_history(
             rank=s.rank or 0,
             user_id=str(s.user_id),
             name=user.name if user else "Unknown",
+            username=user.username if user else None,
             total_points=s.total_points,
             days_logged=0,
             days_in_week=7,
