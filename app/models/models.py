@@ -76,7 +76,7 @@ class FoodEntry(Base):
     __tablename__ = "food_entries"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     description: Mapped[str] = mapped_column(Text, nullable=False)
     source: Mapped[str] = mapped_column(String, nullable=False)  # text | image | barcode
     image_url: Mapped[str | None] = mapped_column(String)
@@ -95,7 +95,7 @@ class RecentFood(Base):
     __tablename__ = "recent_foods"
 
     id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), nullable=False)
+    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     food_name: Mapped[str] = mapped_column(String, nullable=False)
     food_name_he: Mapped[str | None] = mapped_column(String)
     grams: Mapped[float] = mapped_column(Numeric(6, 2), nullable=False)
