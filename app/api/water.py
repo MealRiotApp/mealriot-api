@@ -49,7 +49,7 @@ async def add_water(
     )
     log = result.scalar_one_or_none()
     if log:
-        log.amount_ml += body.amount_ml
+        log.amount_ml = max(0, log.amount_ml + body.amount_ml)
     else:
         log = WaterLog(user_id=current_user.id, date=today, amount_ml=body.amount_ml)
         db.add(log)
