@@ -31,10 +31,11 @@ def upgrade() -> None:
     )
 
     # --- Data migration: seed default water drink for existing users ---
-    users = table('users', column('id', sa.String(36)))
+    pg_uuid = postgresql.UUID(as_uuid=True)
+    users = table('users', column('id', pg_uuid))
     custom_drinks = table('custom_drinks',
-        column('id', sa.String(36)),
-        column('user_id', sa.String(36)),
+        column('id', pg_uuid),
+        column('user_id', pg_uuid),
         column('name', sa.String),
         column('name_he', sa.String),
         column('icon', sa.String),
@@ -62,7 +63,7 @@ def upgrade() -> None:
         ).fetchone()
         if not has_default:
             conn.execute(custom_drinks.insert().values(
-                id=str(uuid4()),
+                id=uuid4(),
                 user_id=user_id,
                 name="Glass of Water",
                 name_he="כוס מים",
