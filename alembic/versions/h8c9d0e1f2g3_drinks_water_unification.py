@@ -7,6 +7,7 @@ Create Date: 2026-03-25 12:00:00.000000
 from typing import Sequence, Union
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy.dialects import postgresql
 from sqlalchemy.sql import table, column
 from uuid import uuid4
 
@@ -22,7 +23,7 @@ def upgrade() -> None:
     op.add_column('custom_drinks', sa.Column('use_count', sa.Integer(), nullable=False, server_default='0'))
 
     # --- FoodEntry: add drink_id FK ---
-    op.add_column('food_entries', sa.Column('drink_id', sa.String(36), nullable=True))
+    op.add_column('food_entries', sa.Column('drink_id', postgresql.UUID(as_uuid=True), nullable=True))
     op.create_index('ix_food_entries_drink_id', 'food_entries', ['drink_id'])
     op.create_foreign_key(
         'fk_food_entries_drink_id', 'food_entries', 'custom_drinks',
