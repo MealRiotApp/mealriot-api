@@ -5,6 +5,8 @@ class FriendOut(BaseModel):
     user_id: str
     username: str | None
     name: str
+    avatar_url: str | None = None
+    created_at: str | None = None
 
 
 class FriendRequestOut(BaseModel):
