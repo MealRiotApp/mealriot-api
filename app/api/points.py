@@ -1,11 +1,12 @@
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User, DailyPoints
 from app.schemas.social import TodayPointsResponse, WeekPointsResponse
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/points", tags=["points"])
 
@@ -15,7 +16,9 @@ def _week_start(d: date) -> date:
 
 
 @router.get("/today", response_model=TodayPointsResponse)
+@limiter.limit("60/minute")
 async def get_today_points(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -42,7 +45,9 @@ async def get_today_points(
 
 
 @router.get("/week", response_model=WeekPointsResponse)
+@limiter.limit("60/minute")
 async def get_week_points(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):

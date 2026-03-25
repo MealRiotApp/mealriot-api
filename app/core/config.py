@@ -17,6 +17,11 @@ class Settings(BaseSettings):
     smtp_user: str | None = None
     smtp_pass: str | None = None
 
+    @property
+    def cors_origins(self) -> list[str]:
+        """Split comma-separated FRONTEND_URL into a list of origins."""
+        return [u.strip() for u in self.frontend_url.split(",") if u.strip()]
+
 
 @lru_cache
 def get_settings() -> Settings:

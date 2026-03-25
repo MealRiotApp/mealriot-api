@@ -1,17 +1,20 @@
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User
 from app.schemas.stats import DailyStatsResponse, RangeStatsResponse
 from app.services.stats_service import get_daily_stats, get_range_stats
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/stats", tags=["stats"])
 
 
 @router.get("/daily", response_model=DailyStatsResponse)
+@limiter.limit("60/minute")
 async def daily_stats(
+    request: Request,
     date: date = Query(...),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -20,7 +23,9 @@ async def daily_stats(
 
 
 @router.get("/range", response_model=RangeStatsResponse)
+@limiter.limit("60/minute")
 async def range_stats(
+    request: Request,
     start: date = Query(...),
     end: date = Query(...),
     db: AsyncSession = Depends(get_db),

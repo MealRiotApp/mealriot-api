@@ -1,9 +1,10 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/goals", tags=["goals"])
 
@@ -125,7 +126,9 @@ def _calc_macros_protein_first(daily_cal: int, weight_kg: float, goal: str, pres
 
 
 @router.post("/calculate", response_model=GoalCalculateResponse)
+@limiter.limit("60/minute")
 async def calculate_goals(
+    request: Request,
     body: GoalCalculateRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),

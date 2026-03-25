@@ -1,6 +1,6 @@
 import uuid as uuid_mod
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, or_, and_
 from app.api.deps import require_active_user
@@ -12,6 +12,7 @@ from app.models.models import (
 from app.schemas.social import (
     GroupCreateBody, GroupOut, LeaderboardResponse, StandingOut, HistoryResponse, WeekHistoryItem,
 )
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/groups", tags=["groups"])
 
@@ -21,7 +22,9 @@ def _week_start(d: date) -> date:
 
 
 @router.post("", status_code=201)
+@limiter.limit("60/minute")
 async def create_group(
+    request: Request,
     body: GroupCreateBody,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -66,7 +69,9 @@ async def create_group(
 
 
 @router.get("", response_model=list[GroupOut])
+@limiter.limit("60/minute")
 async def list_groups(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -90,7 +95,9 @@ async def list_groups(
 
 
 @router.get("/{group_id}/leaderboard", response_model=LeaderboardResponse)
+@limiter.limit("60/minute")
 async def get_leaderboard(
+    request: Request,
     group_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -156,7 +163,9 @@ async def get_leaderboard(
 
 
 @router.get("/{group_id}/history", response_model=HistoryResponse)
+@limiter.limit("60/minute")
 async def get_history(
+    request: Request,
     group_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -189,7 +198,9 @@ async def get_history(
 
 
 @router.delete("/{group_id}/members/me", status_code=204)
+@limiter.limit("60/minute")
 async def leave_group(
+    request: Request,
     group_id: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),

@@ -1,5 +1,5 @@
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends, Header, HTTPException
+from fastapi import APIRouter, Depends, Header, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.core.config import get_settings
@@ -8,6 +8,7 @@ from app.models.models import (
     User, FoodEntry, CompetitionMember, CompetitionGroup,
     DailyPoints, WeeklySummary,
 )
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/internal/jobs", tags=["jobs"])
 
@@ -62,7 +63,8 @@ def _calc_macro_points(user: User, total_protein: float, total_fat: float, total
 
 
 @router.post("/compute-daily-points", dependencies=[Depends(_verify_secret)])
-async def compute_daily_points(db: AsyncSession = Depends(get_db)):
+@limiter.limit("60/minute")
+async def compute_daily_points(request: Request, db: AsyncSession = Depends(get_db)):
     today = date.today()
     # Get all users in active competitions
     member_result = await db.execute(
@@ -119,7 +121,8 @@ async def compute_daily_points(db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/compute-weekly-summary", dependencies=[Depends(_verify_secret)])
-async def compute_weekly_summary(db: AsyncSession = Depends(get_db)):
+@limiter.limit("60/minute")
+async def compute_weekly_summary(request: Request, db: AsyncSession = Depends(get_db)):
     today = date.today()
     ws = _week_start(today)
     we = ws + timedelta(days=6)

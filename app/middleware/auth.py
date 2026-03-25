@@ -1,5 +1,5 @@
 import httpx
-from fastapi import HTTPException, Header, Depends
+from fastapi import HTTPException, Header, Depends, Request
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
@@ -38,6 +38,7 @@ def decode_jwt(token: str) -> dict:
 
 
 async def get_current_user(
+    request: Request,
     authorization: str | None = Header(default=None),
     db: AsyncSession = Depends(get_db),
 ) -> User:
@@ -60,6 +61,7 @@ async def get_current_user(
                     raise HTTPException(403, detail={"error": {"code": "PENDING_APPROVAL", "message": "Waiting for approval"}})
                 if user.status == "suspended":
                     raise HTTPException(403, detail={"error": {"code": "SUSPENDED", "message": "Account suspended"}})
+                request.state.user_id = str(user.id)
                 return user
         raise HTTPException(401, detail={"error": {"code": "UNAUTHORIZED", "message": "Invalid dev token"}})
 
@@ -115,4 +117,5 @@ async def get_current_user(
             detail={"error": {"code": "SUSPENDED",
                               "message": "Your account has been suspended"}},
         )
+    request.state.user_id = str(user.id)
     return user

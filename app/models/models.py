@@ -51,7 +51,6 @@ class User(Base):
     weight_kg: Mapped[float | None] = mapped_column(Numeric(5, 2))
     height_cm: Mapped[float | None] = mapped_column(Numeric(5, 2))
     activity_level: Mapped[str | None] = mapped_column(String)
-    active_cat: Mapped[str] = mapped_column(String, nullable=False, default="whiskers")
     current_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     longest_streak: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     last_log_date: Mapped[date_type | None] = mapped_column(Date, nullable=True)
@@ -108,19 +107,6 @@ class RecentFood(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "food_name", name="uq_recent_foods_user_food"),
-    )
-
-
-class CatUnlock(Base):
-    __tablename__ = "cat_unlocks"
-
-    id: Mapped[uuid.UUID] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
-    user_id: Mapped[uuid.UUID] = mapped_column(GUID(), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    cat_name: Mapped[str] = mapped_column(String(20), nullable=False)
-    unlocked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
-
-    __table_args__ = (
-        UniqueConstraint("user_id", "cat_name", name="uq_cat_unlocks_user_cat"),
     )
 
 
