@@ -11,7 +11,7 @@ from sqlalchemy.sql import table, column
 from uuid import uuid4
 
 revision: str = 'h8c9d0e1f2g3'
-down_revision: Union[str, None] = 'g7b8c9d0e1f2'
+down_revision: Union[str, None] = 'b6e3c5f59769'
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
 
