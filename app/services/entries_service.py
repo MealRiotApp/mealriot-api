@@ -165,10 +165,15 @@ async def create_entry(db: AsyncSession, user: User, data: dict) -> dict:
         )
         db.add(drink_entry)
         entries.append(drink_entry)
-        await _upsert_water(db, user.id, water_ml, today)
         await _upsert_recent_foods(db, user.id, drink_items)
 
+    # Flush entries first to avoid autoflush conflicts during water upsert
     await db.flush()
+
+    # Upsert water after entries are flushed (prevents unique constraint violation)
+    if drink_items:
+        await _upsert_water(db, user.id, _calc_water_ml(drink_items), today)
+
     await _update_streak(db, user, today)
     await db.commit()
     for e in entries:
