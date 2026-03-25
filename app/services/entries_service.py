@@ -134,9 +134,11 @@ async def create_entry(db: AsyncSession, user: User, data: dict) -> dict:
     # Create food entry if there are food items
     if food_items:
         calories, protein, fat, carbs = _sum_items(food_items)
+        # Build description from food items only (not the full input which may include drinks)
+        food_desc = ", ".join(i.get("food_name", "Food") for i in food_items) if drink_items else data["description"]
         food_entry = FoodEntry(
             user_id=user.id,
-            description=data["description"],
+            description=food_desc,
             source=data["source"],
             image_url=data.get("image_url"),
             meal_type=data.get("meal_type", "snack"),
@@ -217,12 +219,29 @@ async def update_entry(db: AsyncSession, user_id: UUID, entry_id: UUID, items: l
             status_code=404,
             detail={"error": {"code": "NOT_FOUND", "message": "Entry not found"}},
         )
+    old_water_ml = entry.water_ml or 0
     calories, protein, fat, carbs = _sum_items(items)
+    new_water_ml = _calc_water_ml(items)
     entry.items = items
     entry.total_calories = calories
     entry.total_protein_g = protein
     entry.total_fat_g = fat
     entry.total_carbs_g = carbs
+    entry.water_ml = new_water_ml
+
+    # Update WaterLog if water amount changed
+    water_diff = new_water_ml - old_water_ml
+    if water_diff != 0:
+        entry_date = entry.logged_at.date() if isinstance(entry.logged_at, datetime) else entry.logged_at
+        wl_result = await db.execute(
+            select(WaterLog).where(WaterLog.user_id == user_id, WaterLog.date == entry_date)
+        )
+        wl = wl_result.scalar_one_or_none()
+        if wl:
+            wl.amount_ml = max(0, wl.amount_ml + water_diff)
+        elif water_diff > 0:
+            db.add(WaterLog(user_id=user_id, date=entry_date, amount_ml=water_diff))
+
     await db.commit()
     await db.refresh(entry)
     return entry
