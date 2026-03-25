@@ -20,7 +20,7 @@ def _get_ip(request: Request) -> str:
 
 limiter = Limiter(
     key_func=_get_user_or_ip,
-    headers_enabled=True,
+    headers_enabled=False,
 )
 
 
