@@ -60,7 +60,9 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 
 if settings.dev_mode:
     from app.api import dev_auth as dev_auth_module
+    from app.api import dev_seed as dev_seed_module
     app.include_router(dev_auth_module.router)
+    app.include_router(dev_seed_module.router)
 
 app.include_router(admin_module.router)
 app.include_router(food_module.router)

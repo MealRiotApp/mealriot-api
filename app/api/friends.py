@@ -142,6 +142,36 @@ async def respond_to_request(
     return {"status": f.status}
 
 
+@router.get("/suggest")
+async def suggest_users(
+    q: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    if len(q) < 2:
+        return {"results": []}
+    blocked_ids = select(Friendship.requester_id).where(
+        Friendship.addressee_id == current_user.id,
+        Friendship.status == "blocked",
+    ).union(
+        select(Friendship.addressee_id).where(
+            Friendship.requester_id == current_user.id,
+            Friendship.status == "blocked",
+        )
+    )
+    result = await db.execute(
+        select(User.username)
+        .where(
+            User.username.isnot(None),
+            User.username.ilike(f"{q}%"),
+            User.id != current_user.id,
+            User.id.notin_(blocked_ids),
+        )
+        .limit(10)
+    )
+    return {"results": [r[0] for r in result.all() if r[0]]}
+
+
 @router.get("/search")
 @limiter.limit("60/minute")
 async def search_user(
