@@ -23,7 +23,7 @@ async def test_create_entry(client, db):
                                  headers={"Authorization": "Bearer faketoken"})
 
     assert resp.status_code == 201
-    data = resp.json()
+    data = resp.json()["entries"][0]
     assert data["total_calories"] == 79
     assert data["description"] == "a slice of bread"
 
@@ -68,7 +68,7 @@ async def test_update_entry_recalculates_totals(client, db):
                return_value=make_jwt_payload(user.email, supabase_id=sid)):
         create_resp = await client.post("/api/v1/entries", json=create_body,
                                         headers={"Authorization": "Bearer faketoken"})
-        entry_id = create_resp.json()["id"]
+        entry_id = create_resp.json()["entries"][0]["id"]
 
         updated_items = [{"food_name": "Bread", "food_name_he": "לחם", "grams": 60,
                           "calories": 158, "protein_g": 5.0, "fat_g": 1.6, "carbs_g": 30.2,
@@ -99,7 +99,7 @@ async def test_delete_entry(client, db):
                return_value=make_jwt_payload(user.email, supabase_id=sid)):
         create_resp = await client.post("/api/v1/entries", json=create_body,
                                         headers={"Authorization": "Bearer faketoken"})
-        entry_id = create_resp.json()["id"]
+        entry_id = create_resp.json()["entries"][0]["id"]
         del_resp = await client.delete(f"/api/v1/entries/{entry_id}",
                                        headers={"Authorization": "Bearer faketoken"})
 
@@ -152,7 +152,7 @@ async def test_cannot_access_other_users_entry(client, db):
                return_value=make_jwt_payload(user1.email, supabase_id=sid1)):
         create_resp = await client.post("/api/v1/entries", json=body,
                                         headers={"Authorization": "Bearer faketoken"})
-    entry_id = create_resp.json()["id"]
+    entry_id = create_resp.json()["entries"][0]["id"]
 
     with patch("app.middleware.auth.decode_jwt",
                return_value=make_jwt_payload(user2.email, supabase_id=sid2)):
