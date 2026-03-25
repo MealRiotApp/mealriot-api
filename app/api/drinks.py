@@ -254,5 +254,12 @@ async def delete_drink(
         raise HTTPException(404, detail="Drink not found")
     if drink.is_default:
         raise HTTPException(400, detail="Cannot delete default drink")
+    # Null out drink_id on any food entries referencing this drink
+    from sqlalchemy import update
+    await db.execute(
+        update(FoodEntry)
+        .where(FoodEntry.drink_id == drink.id)
+        .values(drink_id=None)
+    )
     await db.delete(drink)
     await db.commit()
