@@ -36,6 +36,7 @@ class StandingOut(BaseModel):
     rank: int
     user_id: str
     name: str
+    username: str | None = None
     total_points: int
     days_logged: int
     days_in_week: int

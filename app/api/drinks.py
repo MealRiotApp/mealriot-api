@@ -23,7 +23,7 @@ class DrinkCreate(BaseModel):
     fat_g: float = 0
     carbs_g: float = 0
     counts_as_water: bool = True
-    water_pct: int = 100
+    water_pct: int
 
 
 class DrinkOut(BaseModel):
