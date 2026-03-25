@@ -1,11 +1,12 @@
 from datetime import date
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User, WaterLog
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/water", tags=["water"])
 
@@ -21,7 +22,9 @@ class WaterResponse(BaseModel):
 
 
 @router.get("/today", response_model=WaterResponse)
+@limiter.limit("60/minute")
 async def get_today_water(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -38,7 +41,9 @@ async def get_today_water(
 
 
 @router.post("/add", response_model=WaterResponse)
+@limiter.limit("60/minute")
 async def add_water(
+    request: Request,
     body: WaterAddRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),

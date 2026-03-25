@@ -3,7 +3,10 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import HTTPException
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
 from app.core.config import get_settings
+from app.middleware.rate_limit import limiter, rate_limit_exceeded_handler
 from app.middleware.auth import prefetch_jwks
 from app.api import admin as admin_module
 from app.api import food as food_module
@@ -32,6 +35,10 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="NutriLog API", version="1.0.0", lifespan=lifespan)
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
@@ -73,5 +80,6 @@ app.include_router(insight_module.router)
 app.include_router(eating_windows_module.router)
 
 @app.get("/health")
+@limiter.exempt
 async def health():
     return {"status": "ok"}

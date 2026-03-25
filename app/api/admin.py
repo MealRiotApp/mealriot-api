@@ -1,11 +1,12 @@
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.api.deps import require_admin
 from app.core.database import get_db
 from app.models.models import User
 from app.schemas.user import UserOut, UserStatusUpdate
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/admin", tags=["admin"])
 
@@ -13,7 +14,9 @@ VALID_STATUSES = {"active", "suspended"}
 
 
 @router.get("/users", response_model=list[UserOut])
+@limiter.limit("60/minute")
 async def list_users(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(require_admin),
 ):
@@ -22,7 +25,9 @@ async def list_users(
 
 
 @router.patch("/users/{user_id}/status", response_model=UserOut)
+@limiter.limit("60/minute")
 async def update_user_status(
+    request: Request,
     user_id: UUID,
     body: UserStatusUpdate,
     db: AsyncSession = Depends(get_db),

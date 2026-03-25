@@ -1,5 +1,5 @@
 import secrets
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, func
 from app.api.deps import require_active_user
@@ -9,12 +9,15 @@ from app.schemas.social import (
     FriendOut, FriendRequestOut, FriendRequestBody,
     FriendActionBody, UsernameSetBody,
 )
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/friends", tags=["friends"])
 
 
 @router.get("", response_model=list[FriendOut])
+@limiter.limit("60/minute")
 async def list_friends(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -37,7 +40,9 @@ async def list_friends(
 
 
 @router.post("/request", status_code=201)
+@limiter.limit("60/minute")
 async def send_request(
+    request: Request,
     body: FriendRequestBody,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -85,7 +90,9 @@ async def send_request(
 
 
 @router.get("/requests", response_model=list[FriendRequestOut])
+@limiter.limit("60/minute")
 async def get_requests(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -108,7 +115,9 @@ async def get_requests(
 
 
 @router.patch("/{friendship_id}")
+@limiter.limit("60/minute")
 async def respond_to_request(
+    request: Request,
     friendship_id: str,
     body: FriendActionBody,
     db: AsyncSession = Depends(get_db),
@@ -134,7 +143,9 @@ async def respond_to_request(
 
 
 @router.get("/search")
+@limiter.limit("60/minute")
 async def search_user(
+    request: Request,
     username: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -158,7 +169,9 @@ async def search_user(
 
 
 @router.post("/username")
+@limiter.limit("60/minute")
 async def set_username(
+    request: Request,
     body: UsernameSetBody,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),

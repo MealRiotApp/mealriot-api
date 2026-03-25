@@ -3,13 +3,14 @@ Dev-only authentication bypass for automated testing (Playwright, etc.)
 MUST be disabled in production via DEV_MODE=false env var.
 """
 import uuid
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.models import User
+from app.middleware.rate_limit import limiter, _get_ip
 
 router = APIRouter(prefix="/api/v1/dev", tags=["dev"])
 
@@ -26,7 +27,9 @@ class DevLoginResponse(BaseModel):
 
 
 @router.post("/login", response_model=DevLoginResponse)
+@limiter.limit("20/minute", key_func=_get_ip)
 async def dev_login(
+    request: Request,
     body: DevLoginRequest,
     db: AsyncSession = Depends(get_db),
 ):

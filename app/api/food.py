@@ -1,8 +1,9 @@
 import asyncio
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from supabase import create_client
 from app.api.deps import require_active_user
+from app.middleware.rate_limit import limiter
 from app.core.config import get_settings
 from app.models.models import User
 from app.schemas.food import ParseTextRequest, ParseTextResponse, ParseImageResponse, BarcodeResponse
@@ -26,7 +27,9 @@ def _get_sb():
 
 
 @router.post("/parse-text", response_model=ParseTextResponse)
+@limiter.limit("10/minute")
 async def parse_text_route(
+    request: Request,
     body: ParseTextRequest,
     current_user: User = Depends(require_active_user),
 ):
@@ -48,7 +51,9 @@ def _upload_and_sign(path: str, image_bytes: bytes, content_type: str) -> str:
 
 
 @router.post("/parse-image", response_model=ParseImageResponse)
+@limiter.limit("10/minute")
 async def parse_image_route(
+    request: Request,
     image: UploadFile = File(...),
     current_user: User = Depends(require_active_user),
 ):
@@ -74,7 +79,9 @@ async def parse_image_route(
 
 
 @router.get("/barcode/{barcode}", response_model=BarcodeResponse)
+@limiter.limit("60/minute")
 async def barcode_lookup_route(
+    request: Request,
     barcode: str,
     current_user: User = Depends(require_active_user),
 ):

@@ -1,11 +1,12 @@
 from datetime import date
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User
 from app.services.summary_service import update_user_summary
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/insight", tags=["insight"])
 
@@ -41,7 +42,9 @@ def _reset_if_new_day(user: User) -> None:
 
 
 @router.get("/today", response_model=InsightResponse)
+@limiter.limit("10/minute")
 async def get_daily_insight(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -83,7 +86,9 @@ async def get_daily_insight(
 
 
 @router.post("/refresh", response_model=InsightResponse)
+@limiter.limit("10/minute")
 async def refresh_insight(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):

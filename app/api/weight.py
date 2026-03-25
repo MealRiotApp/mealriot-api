@@ -1,11 +1,12 @@
 from datetime import date, timedelta
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User, WeightLog
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/weight", tags=["weight"])
 
@@ -25,7 +26,9 @@ class WeightHistoryResponse(BaseModel):
 
 
 @router.post("", response_model=WeightEntry)
+@limiter.limit("60/minute")
 async def log_weight(
+    request: Request,
     body: WeightLogRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -46,7 +49,9 @@ async def log_weight(
 
 
 @router.get("/history", response_model=WeightHistoryResponse)
+@limiter.limit("60/minute")
 async def get_weight_history(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -63,7 +68,9 @@ async def get_weight_history(
 
 
 @router.delete("/{date_str}", status_code=204)
+@limiter.limit("60/minute")
 async def delete_weight(
+    request: Request,
     date_str: str,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),

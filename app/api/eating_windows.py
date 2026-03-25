@@ -1,5 +1,5 @@
 from datetime import time
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, delete
 from app.api.deps import require_active_user
@@ -8,12 +8,15 @@ from app.models.models import User, EatingWindow
 from app.schemas.eating_windows import (
     EatingWindowsResponse, EatingWindowItem, UpdateEatingWindowsRequest,
 )
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/eating-windows", tags=["eating-windows"])
 
 
 @router.get("", response_model=EatingWindowsResponse)
+@limiter.limit("60/minute")
 async def get_eating_windows(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -40,7 +43,9 @@ async def get_eating_windows(
 
 
 @router.put("", response_model=EatingWindowsResponse)
+@limiter.limit("60/minute")
 async def update_eating_windows(
+    request: Request,
     body: UpdateEatingWindowsRequest,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -58,4 +63,4 @@ async def update_eating_windows(
             end_time=time(h_e, m_e),
         ))
     await db.commit()
-    return await get_eating_windows(db=db, current_user=current_user)
+    return await get_eating_windows(request=request, db=db, current_user=current_user)

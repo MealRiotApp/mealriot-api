@@ -4,8 +4,12 @@ from unittest.mock import patch, AsyncMock
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from app.main import app
+from app.middleware.rate_limit import limiter
 from app.core.database import Base, get_db
 import uuid
+
+# Disable rate limiting during tests
+limiter.enabled = False
 
 
 @pytest.fixture(autouse=True)

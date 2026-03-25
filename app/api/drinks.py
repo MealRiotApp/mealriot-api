@@ -1,12 +1,13 @@
 import json
 from uuid import UUID
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User, CustomDrink
+from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/drinks", tags=["drinks"])
 
@@ -58,7 +59,9 @@ class DrinkParseResponse(BaseModel):
 
 
 @router.get("", response_model=list[DrinkOut])
+@limiter.limit("60/minute")
 async def list_drinks(
+    request: Request,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
@@ -78,7 +81,9 @@ async def list_drinks(
 
 
 @router.post("/parse", response_model=DrinkParseResponse)
+@limiter.limit("10/minute")
 async def parse_drink(
+    request: Request,
     body: DrinkParseRequest,
     _current_user: User = Depends(require_active_user),
 ):
@@ -137,7 +142,9 @@ Return ONLY the JSON object."""},
 
 
 @router.post("", response_model=DrinkOut, status_code=201)
+@limiter.limit("60/minute")
 async def create_drink(
+    request: Request,
     body: DrinkCreate,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
@@ -162,7 +169,9 @@ async def create_drink(
 
 
 @router.delete("/{drink_id}", status_code=204)
+@limiter.limit("60/minute")
 async def delete_drink(
+    request: Request,
     drink_id: UUID,
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
