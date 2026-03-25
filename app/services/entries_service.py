@@ -68,32 +68,116 @@ async def _upsert_recent_foods(db: AsyncSession, user_id: UUID, items: list[dict
             ))
 
 
-async def create_entry(db: AsyncSession, user: User, data: dict) -> FoodEntry:
-    items = data["items"]
-    calories, protein, fat, carbs = _sum_items(items)
-    logged_at = data.get("logged_at") or datetime.now(timezone.utc)
+def _calc_water_ml(items: list[dict]) -> int:
+    """Sum water ml from drink items."""
+    total = 0
+    for item in items:
+        if item.get("is_drink"):
+            vol = item.get("volume_ml", item.get("grams", 0))
+            pct = item.get("water_pct", 0)
+            total += round(vol * pct / 100)
+    return total
 
-    entry = FoodEntry(
-        user_id=user.id,
-        description=data["description"],
-        source=data["source"],
-        image_url=data.get("image_url"),
-        meal_type=data.get("meal_type", "snack"),
-        items=items,
-        total_calories=calories,
-        total_protein_g=protein,
-        total_fat_g=fat,
-        total_carbs_g=carbs,
-        logged_at=logged_at,
+
+async def _upsert_water(db: AsyncSession, user_id: UUID, water_ml: int, log_date: date) -> None:
+    """Add water_ml to the WaterLog for the given date."""
+    if water_ml <= 0:
+        return
+    wl_result = await db.execute(
+        select(WaterLog).where(WaterLog.user_id == user_id, WaterLog.date == log_date)
     )
-    db.add(entry)
-    await db.flush()
-    await _upsert_recent_foods(db, user.id, items)
+    wl = wl_result.scalar_one_or_none()
+    if wl:
+        wl.amount_ml = wl.amount_ml + water_ml
+    else:
+        db.add(WaterLog(user_id=user_id, date=log_date, amount_ml=water_ml))
+
+
+def _build_drink_suggestions(drink_items: list[dict]) -> list[dict]:
+    """Build drink suggestion dicts from drink items."""
+    suggestions = []
+    for item in drink_items:
+        suggestions.append({
+            "name": item.get("food_name", "Drink"),
+            "name_he": item.get("food_name_he"),
+            "icon": "🥤",
+            "volume_ml": item.get("volume_ml", item.get("grams", 250)),
+            "calories": item.get("calories", 0),
+            "sugar_g": 0,
+            "protein_g": item.get("protein_g", 0),
+            "fat_g": item.get("fat_g", 0),
+            "carbs_g": item.get("carbs_g", 0),
+            "water_pct": item.get("water_pct", 100),
+        })
+    return suggestions
+
+
+async def create_entry(db: AsyncSession, user: User, data: dict) -> dict:
+    """Create entry/entries. Returns dict with 'entries' list and 'drink_suggestions'."""
+    all_items = data["items"]
+    logged_at = data.get("logged_at") or datetime.now(timezone.utc)
     today = (logged_at if isinstance(logged_at, date) else logged_at.date()) if logged_at else date.today()
+
+    food_items = [i for i in all_items if not i.get("is_drink")]
+    drink_items = [i for i in all_items if i.get("is_drink")]
+
+    entries = []
+
+    # Create food entry if there are food items
+    if food_items:
+        calories, protein, fat, carbs = _sum_items(food_items)
+        food_entry = FoodEntry(
+            user_id=user.id,
+            description=data["description"],
+            source=data["source"],
+            image_url=data.get("image_url"),
+            meal_type=data.get("meal_type", "snack"),
+            items=food_items,
+            total_calories=calories,
+            total_protein_g=protein,
+            total_fat_g=fat,
+            total_carbs_g=carbs,
+            water_ml=0,
+            logged_at=logged_at,
+        )
+        db.add(food_entry)
+        entries.append(food_entry)
+        await _upsert_recent_foods(db, user.id, food_items)
+
+    # Create drink entry if there are drink items
+    if drink_items:
+        calories, protein, fat, carbs = _sum_items(drink_items)
+        water_ml = _calc_water_ml(drink_items)
+        drink_desc = ", ".join(i.get("food_name", "Drink") for i in drink_items)
+        drink_entry = FoodEntry(
+            user_id=user.id,
+            description=drink_desc,
+            source="drink",
+            image_url=data.get("image_url") if not food_items else None,
+            meal_type=data.get("meal_type", "snack"),
+            items=drink_items,
+            total_calories=calories,
+            total_protein_g=protein,
+            total_fat_g=fat,
+            total_carbs_g=carbs,
+            water_ml=water_ml,
+            logged_at=logged_at,
+        )
+        db.add(drink_entry)
+        entries.append(drink_entry)
+        await _upsert_water(db, user.id, water_ml, today)
+        await _upsert_recent_foods(db, user.id, drink_items)
+
+    await db.flush()
     await _update_streak(db, user, today)
     await db.commit()
-    await db.refresh(entry)
-    return entry
+    for e in entries:
+        await db.refresh(e)
+
+    return {
+        "entries": entries,
+        "drink_suggestions": _build_drink_suggestions(drink_items),
+    }
 
 
 async def list_entries_for_date(db: AsyncSession, user_id: UUID, target_date: date) -> list[FoodEntry]:
