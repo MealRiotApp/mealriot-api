@@ -201,6 +201,9 @@ async def log_drink(
         "fat_g": float(drink.fat_g),
         "carbs_g": float(drink.carbs_g),
         "confidence": "high",
+        "is_drink": True,
+        "volume_ml": drink.volume_ml,
+        "water_pct": drink.water_pct,
     }]
 
     entry = FoodEntry(
