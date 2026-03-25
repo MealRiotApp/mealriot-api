@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.database import get_db
-from app.models.models import User
+from app.models.models import User, CustomDrink
 
 _jwks_cache: dict | None = None
 
@@ -96,6 +96,28 @@ async def get_current_user(
         db.add(user)
         await db.commit()
         await db.refresh(user)
+
+        # Seed default water drink (best-effort)
+        try:
+            default_drink = CustomDrink(
+                user_id=user.id,
+                name="Glass of Water",
+                name_he="כוס מים",
+                icon="💧",
+                volume_ml=250,
+                calories=0,
+                sugar_g=0, protein_g=0, fat_g=0, carbs_g=0,
+                counts_as_water=True,
+                water_pct=100,
+                is_default=True,
+                use_count=0,
+            )
+            db.add(default_drink)
+            await db.commit()
+            await db.refresh(user)
+        except Exception:
+            import logging
+            logging.getLogger(__name__).warning("Failed to seed default drink for user %s", user.id)
 
         if status == "pending":
             try:
