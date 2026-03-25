@@ -1,4 +1,5 @@
 import json
+from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel
@@ -6,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.api.deps import require_active_user
 from app.core.database import get_db
-from app.models.models import User, CustomDrink
+from app.models.models import User, CustomDrink, FoodEntry, WaterLog
+from app.schemas.entry import EntryOut
 from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/drinks", tags=["drinks"])
@@ -39,6 +41,8 @@ class DrinkOut(BaseModel):
     carbs_g: float
     counts_as_water: bool
     water_pct: int
+    is_default: bool = False
+    use_count: int = 0
 
 
 class DrinkParseRequest(BaseModel):
@@ -66,7 +70,9 @@ async def list_drinks(
     current_user: User = Depends(require_active_user),
 ):
     result = await db.execute(
-        select(CustomDrink).where(CustomDrink.user_id == current_user.id)
+        select(CustomDrink)
+        .where(CustomDrink.user_id == current_user.id)
+        .order_by(CustomDrink.is_default.desc(), CustomDrink.use_count.desc(), CustomDrink.name.asc())
     )
     return [
         DrinkOut(
@@ -74,7 +80,7 @@ async def list_drinks(
             volume_ml=d.volume_ml, calories=d.calories, sugar_g=float(d.sugar_g),
             protein_g=float(d.protein_g), fat_g=float(d.fat_g),
             carbs_g=float(d.carbs_g), counts_as_water=d.counts_as_water,
-            water_pct=d.water_pct,
+            water_pct=d.water_pct, is_default=d.is_default, use_count=d.use_count,
         )
         for d in result.scalars().all()
     ]
@@ -164,8 +170,72 @@ async def create_drink(
         volume_ml=drink.volume_ml, calories=drink.calories, sugar_g=float(drink.sugar_g),
         protein_g=float(drink.protein_g), fat_g=float(drink.fat_g),
         carbs_g=float(drink.carbs_g), counts_as_water=drink.counts_as_water,
-        water_pct=drink.water_pct,
+        water_pct=drink.water_pct, is_default=drink.is_default, use_count=drink.use_count,
     )
+
+
+@router.post("/{drink_id}/log", status_code=201)
+@limiter.limit("60/minute")
+async def log_drink(
+    request: Request,
+    drink_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    """Log a drink: create FoodEntry + atomically update WaterLog + increment use_count."""
+    result = await db.execute(
+        select(CustomDrink).where(CustomDrink.id == drink_id, CustomDrink.user_id == current_user.id)
+    )
+    drink = result.scalar_one_or_none()
+    if not drink:
+        raise HTTPException(404, detail="Drink not found")
+
+    now = datetime.now(timezone.utc)
+    water_ml = round(drink.volume_ml * drink.water_pct / 100) if drink.counts_as_water else 0
+    items = [{
+        "food_name": drink.name,
+        "food_name_he": drink.name_he,
+        "grams": drink.volume_ml,
+        "calories": drink.calories,
+        "protein_g": float(drink.protein_g),
+        "fat_g": float(drink.fat_g),
+        "carbs_g": float(drink.carbs_g),
+        "confidence": "high",
+    }]
+
+    entry = FoodEntry(
+        user_id=current_user.id,
+        description=drink.name,
+        source="drink",
+        drink_id=drink.id,
+        meal_type="snack",
+        items=items,
+        total_calories=drink.calories,
+        total_protein_g=float(drink.protein_g),
+        total_fat_g=float(drink.fat_g),
+        total_carbs_g=float(drink.carbs_g),
+        logged_at=now,
+    )
+    db.add(entry)
+
+    # Update water log atomically
+    if water_ml > 0:
+        today = now.date()
+        wl_result = await db.execute(
+            select(WaterLog).where(WaterLog.user_id == current_user.id, WaterLog.date == today)
+        )
+        wl = wl_result.scalar_one_or_none()
+        if wl:
+            wl.amount_ml = wl.amount_ml + water_ml
+        else:
+            db.add(WaterLog(user_id=current_user.id, date=today, amount_ml=water_ml))
+
+    # Increment use_count via SQL expression (race-safe)
+    drink.use_count = CustomDrink.use_count + 1
+
+    await db.commit()
+    await db.refresh(entry)
+    return EntryOut.model_validate(entry).model_dump(mode="json")
 
 
 @router.delete("/{drink_id}", status_code=204)
@@ -182,5 +252,7 @@ async def delete_drink(
     drink = result.scalar_one_or_none()
     if not drink:
         raise HTTPException(404, detail="Drink not found")
+    if drink.is_default:
+        raise HTTPException(400, detail="Cannot delete default drink")
     await db.delete(drink)
     await db.commit()

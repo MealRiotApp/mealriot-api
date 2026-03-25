@@ -7,7 +7,7 @@ from app.schemas.food import FoodItem
 
 class EntryCreate(BaseModel):
     description: str
-    source: Literal["text", "image", "barcode"]
+    source: Literal["text", "image", "barcode", "drink"]
     image_url: str | None = None
     meal_type: Literal["breakfast", "lunch", "dinner", "snack"] = "snack"
     items: list[FoodItem]
@@ -23,6 +23,7 @@ class EntryOut(BaseModel):
     description: str
     source: str
     image_url: str | None
+    drink_id: UUID | None = None
     meal_type: str
     items: list[FoodItem]
     total_calories: int
