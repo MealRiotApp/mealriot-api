@@ -5,7 +5,7 @@ on:
     branches: [main]
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -20,8 +20,13 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
           docker build -t "$IMAGE_LC:latest" .
           docker push "$IMAGE_LC:latest"
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    if: ${{ vars.VPS_ENABLED == 'true' }}
+    steps:
       - name: Deploy to VPS
-        if: ${{ secrets.VPS_HOST != '' }}
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
