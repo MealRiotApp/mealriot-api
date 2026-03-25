@@ -208,6 +208,7 @@ async def log_drink(
         description=drink.name,
         source="drink",
         drink_id=drink.id,
+        water_ml=water_ml,
         meal_type="snack",
         items=items,
         total_calories=drink.calories,

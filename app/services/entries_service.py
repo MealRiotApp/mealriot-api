@@ -2,7 +2,7 @@ from datetime import datetime, timezone, date
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
-from app.models.models import FoodEntry, RecentFood, User, CustomDrink, WaterLog
+from app.models.models import FoodEntry, RecentFood, User, WaterLog
 
 
 async def _update_streak(db: AsyncSession, user: User, today: date) -> None:
@@ -143,25 +143,18 @@ async def delete_entry(db: AsyncSession, user_id: UUID, entry_id: UUID) -> None:
             detail={"error": {"code": "NOT_FOUND", "message": "Entry not found"}},
         )
 
-    # If this entry came from a drink, subtract water from the entry's logged_at date
-    if entry.drink_id:
-        drink_result = await db.execute(
-            select(CustomDrink).where(CustomDrink.id == entry.drink_id)
+    # Subtract water that was added when this entry was created
+    if entry.water_ml and entry.water_ml > 0:
+        entry_date = entry.logged_at.date() if hasattr(entry.logged_at, 'date') else entry.logged_at
+        wl_result = await db.execute(
+            select(WaterLog).where(
+                WaterLog.user_id == user_id,
+                WaterLog.date == entry_date,
+            )
         )
-        drink = drink_result.scalar_one_or_none()
-        if drink and drink.counts_as_water:
-            water_ml = round(drink.volume_ml * drink.water_pct / 100)
-            if water_ml > 0:
-                entry_date = entry.logged_at.date() if hasattr(entry.logged_at, 'date') else entry.logged_at
-                wl_result = await db.execute(
-                    select(WaterLog).where(
-                        WaterLog.user_id == user_id,
-                        WaterLog.date == entry_date,
-                    )
-                )
-                wl = wl_result.scalar_one_or_none()
-                if wl:
-                    wl.amount_ml = max(0, wl.amount_ml - water_ml)
+        wl = wl_result.scalar_one_or_none()
+        if wl:
+            wl.amount_ml = max(0, wl.amount_ml - entry.water_ml)
 
     await db.delete(entry)
     await db.commit()
