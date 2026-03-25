@@ -116,7 +116,15 @@ async def create_entry(db: AsyncSession, user: User, data: dict) -> dict:
     """Create entry/entries. Returns dict with 'entries' list and 'drink_suggestions'."""
     all_items = data["items"]
     logged_at = data.get("logged_at") or datetime.now(timezone.utc)
-    today = (logged_at if isinstance(logged_at, date) else logged_at.date()) if logged_at else date.today()
+    # Always extract a pure date object — datetime is a subclass of date,
+    # so isinstance(datetime_obj, date) is True, which was causing datetime
+    # to be passed to WaterLog queries instead of date, breaking PostgreSQL.
+    if logged_at and isinstance(logged_at, datetime):
+        today = logged_at.date()
+    elif logged_at and isinstance(logged_at, date):
+        today = logged_at
+    else:
+        today = date.today()
 
     food_items = [i for i in all_items if not i.get("is_drink")]
     drink_items = [i for i in all_items if i.get("is_drink")]
