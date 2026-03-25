@@ -5,6 +5,24 @@ from sqlalchemy import select, func
 from app.models.models import FoodEntry, RecentFood, User
 
 
+async def _update_streak(db: AsyncSession, user: User, today: date) -> None:
+    """Increment or reset the user's logging streak."""
+    if hasattr(today, "date"):
+        today = today.date()
+    last = user.last_log_date
+    if hasattr(last, "date"):
+        last = last.date()
+    if last == today:
+        return
+    if last and (today - last).days == 1:
+        user.current_streak += 1
+    else:
+        user.current_streak = 1
+    user.last_log_date = today
+    if user.current_streak > user.longest_streak:
+        user.longest_streak = user.current_streak
+
+
 def _sum_items(items: list[dict]) -> tuple[int, float, float, float]:
     calories = sum(int(i.get("calories", 0)) for i in items)
     protein = sum(float(i.get("protein_g", 0)) for i in items)
@@ -71,9 +89,8 @@ async def create_entry(db: AsyncSession, user: User, data: dict) -> FoodEntry:
     db.add(entry)
     await db.flush()
     await _upsert_recent_foods(db, user.id, items)
-    from app.services.pet_service import update_streak_on_entry
     today = (logged_at if isinstance(logged_at, date) else logged_at.date()) if logged_at else date.today()
-    await update_streak_on_entry(db, user, today)
+    await _update_streak(db, user, today)
     await db.commit()
     await db.refresh(entry)
     return entry
