@@ -21,6 +21,7 @@ jobs:
           docker build -t "$IMAGE_LC:latest" .
           docker push "$IMAGE_LC:latest"
       - name: Deploy to VPS
+        if: ${{ secrets.VPS_HOST != '' }}
         uses: appleboy/ssh-action@v1
         with:
           host: ${{ secrets.VPS_HOST }}
