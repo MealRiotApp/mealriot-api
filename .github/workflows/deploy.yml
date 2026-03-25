@@ -13,7 +13,7 @@ jobs:
     env:
       IMAGE: ghcr.io/${{ github.repository }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
       - name: Build and push Docker image
         run: |
           IMAGE_LC=$(echo "$IMAGE" | tr '[:upper:]' '[:lower:]')
