@@ -5,6 +5,19 @@ from typing import Literal
 from app.schemas.food import FoodItem
 
 
+class DrinkSuggestion(BaseModel):
+    name: str
+    name_he: str | None = None
+    icon: str = "🥤"
+    volume_ml: int
+    calories: int
+    sugar_g: float = 0
+    protein_g: float = 0
+    fat_g: float = 0
+    carbs_g: float = 0
+    water_pct: int = 100
+
+
 class EntryCreate(BaseModel):
     description: str
     source: Literal["text", "image", "barcode", "drink"]
@@ -32,6 +45,12 @@ class EntryOut(BaseModel):
     total_carbs_g: float
     logged_at: datetime
     model_config = {"from_attributes": True}
+
+
+class EntryCreateResponse(BaseModel):
+    entries: list[EntryOut]
+    drink_suggestions: list[DrinkSuggestion] = []
+    reaction: str = ""
 
 
 class EntriesListResponse(BaseModel):

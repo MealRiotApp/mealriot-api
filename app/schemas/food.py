@@ -11,6 +11,9 @@ class FoodItem(BaseModel):
     fat_g: float
     carbs_g: float
     confidence: Literal["high", "medium", "low"] = "medium"
+    is_drink: bool = False
+    volume_ml: int | None = None
+    water_pct: int | None = None
 
 
 class ParseTextRequest(BaseModel):

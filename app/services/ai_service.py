@@ -20,16 +20,20 @@ The user may write in Hebrew or English. Detect language automatically.
 For each food item identified, return an object with:
   food_name (string, English)
   food_name_he (string, Hebrew)
-  grams (number — use exact value if user specified, otherwise estimate)
+  grams (number — use exact value if user specified, otherwise estimate. For beverages, use volume in ml)
   calories (integer kcal)
   protein_g (number, 1 decimal)
   fat_g (number, 1 decimal)
   carbs_g (number, 1 decimal)
   confidence ("high" if grams were explicit, "medium" if estimated from portion, "low" if uncertain)
+  is_drink (boolean — true if the item is a beverage: coffee, tea, juice, cocktail, beer, wine, soda, smoothie, water, milk, energy drink, etc.)
+  volume_ml (integer — only when is_drink is true, volume in milliliters)
+  water_pct (integer 0-100 — only when is_drink is true, percentage that counts as water intake. Examples: water=100, coffee/tea=95, beer=92, wine=85, juice=85, soda=90, milk=87)
 
 Rules:
 - If grams are explicit (e.g. "150 גרם"), use that exactly.
 - Convert portion descriptions (slice, cup, פרוסה) to grams using standard measures.
+- For beverages, set grams equal to volume_ml.
 - Use USDA as your reference.
 - When uncertain, lean conservative.
 - Always return a JSON object with an "items" key containing the array.
@@ -44,6 +48,7 @@ For each item, estimate portion size in grams using visual context:
   - Food density and typical serving sizes
 
 Return the same JSON array structure as text parsing, plus a "visual_note" field per item.
+Include is_drink, volume_ml, and water_pct fields for any beverages visible.
 Flag confidence as "low" if items are obscured, stacked, or ambiguous."""
 
 

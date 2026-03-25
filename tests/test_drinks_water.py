@@ -156,7 +156,7 @@ async def test_delete_non_drink_entry_no_water_change(client, db):
             "meal_type": "lunch",
             "items": [{"food_name": "Salad", "grams": 200, "calories": 150, "protein_g": 5, "fat_g": 3, "carbs_g": 20, "confidence": "high"}],
         })
-        entry_id = resp.json()["id"]
+        entry_id = resp.json()["entries"][0]["id"]
         resp = await client.delete(f"/api/v1/entries/{entry_id}", headers={"Authorization": "Bearer fake"})
         assert resp.status_code == 204
 

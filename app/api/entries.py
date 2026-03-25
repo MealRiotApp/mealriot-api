@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User
-from app.schemas.entry import EntryCreate, EntryUpdate, EntryOut, EntriesListResponse
+from app.schemas.entry import EntryCreate, EntryUpdate, EntryOut, EntriesListResponse, DrinkSuggestion, EntryCreateResponse
 from app.services.entries_service import create_entry, list_entries_for_date, update_entry, delete_entry
 from app.middleware.rate_limit import limiter
 
@@ -39,14 +39,17 @@ async def create(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(require_active_user),
 ):
-    entry = await create_entry(db, current_user, body.model_dump())
+    result = await create_entry(db, current_user, body.model_dump())
     lang = current_user.language or "en"
     reactions = REACTIONS.get(lang, REACTIONS["en"])
     reaction = random.choice(reactions)
 
-    entry_data = EntryOut.model_validate(entry).model_dump(mode="json")
-    entry_data["reaction"] = reaction
-    return JSONResponse(status_code=201, content=entry_data)
+    entries_out = [EntryOut.model_validate(e).model_dump(mode="json") for e in result["entries"]]
+    return JSONResponse(status_code=201, content={
+        "entries": entries_out,
+        "drink_suggestions": result["drink_suggestions"],
+        "reaction": reaction,
+    })
 
 
 @router.get("", response_model=EntriesListResponse)
