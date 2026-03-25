@@ -11,7 +11,6 @@ from app.api import entries as entries_module
 from app.api import stats as stats_module
 from app.api import recent_foods as recent_foods_module
 from app.api import profile as profile_module
-from app.api import pet as pet_module
 from app.api import friends as friends_module
 from app.api import groups as groups_module
 from app.api import points as points_module
@@ -62,7 +61,6 @@ app.include_router(entries_module.router)
 app.include_router(stats_module.router)
 app.include_router(recent_foods_module.router)
 app.include_router(profile_module.router)
-app.include_router(pet_module.router)
 app.include_router(friends_module.router)
 app.include_router(groups_module.router)
 app.include_router(points_module.router)
