@@ -83,8 +83,7 @@ async def stream_chat(
         # Truncate history to last 20 messages
         truncated_history = history[-20:]
 
-        messages = [
-            {"role": "system", "content": system_prompt},
+        input_messages = [
             *truncated_history,
             {"role": "user", "content": message},
         ]
@@ -92,15 +91,15 @@ async def stream_chat(
         client = _get_client()
         full_text = ""
 
-        stream = await client.chat.completions.create(
+        stream = await client.responses.create(
             model="gpt-4o",
-            messages=messages,
-            max_tokens=1000,
+            instructions=system_prompt,
+            input=input_messages,
             stream=True,
         )
-        async for chunk in stream:
-            if chunk.choices and chunk.choices[0].delta.content:
-                token = chunk.choices[0].delta.content
+        async for event in stream:
+            if event.type == "response.output_text.delta":
+                token = event.delta
                 full_text += token
                 yield f"data: {json.dumps({'token': token})}\n\n"
 
