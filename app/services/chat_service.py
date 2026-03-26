@@ -92,15 +92,17 @@ async def stream_chat(
         client = _get_client()
         full_text = ""
 
-        async with client.chat.completions.stream(
+        stream = await client.chat.completions.create(
             model="gpt-4o",
             messages=messages,
             max_tokens=1000,
-        ) as stream:
-            async for event in stream:
-                if event.type == "content.delta":
-                    full_text += event.delta
-                    yield f"data: {json.dumps({'token': event.delta})}\n\n"
+            stream=True,
+        )
+        async for chunk in stream:
+            if chunk.choices and chunk.choices[0].delta.content:
+                token = chunk.choices[0].delta.content
+                full_text += token
+                yield f"data: {json.dumps({'token': token})}\n\n"
 
         # Check for food extraction
         _, foods = _extract_foods(full_text)

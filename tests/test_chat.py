@@ -6,23 +6,18 @@ from app.services.chat_service import _extract_foods
 
 
 def _make_mock_stream(text_chunks: list[str] | None = None):
-    """Build a mock OpenAI streaming context manager."""
+    """Build a mock async iterable that mimics openai stream chunks."""
     if text_chunks is None:
         text_chunks = ["Hello", " there"]
 
-    mock_stream = AsyncMock()
-    mock_stream.__aenter__ = AsyncMock(return_value=mock_stream)
-    mock_stream.__aexit__ = AsyncMock(return_value=False)
+    async def mock_chunks():
+        for text in text_chunks:
+            chunk = MagicMock()
+            chunk.choices = [MagicMock()]
+            chunk.choices[0].delta.content = text
+            yield chunk
 
-    async def mock_events():
-        for chunk in text_chunks:
-            event = MagicMock()
-            event.type = "content.delta"
-            event.delta = chunk
-            yield event
-
-    mock_stream.__aiter__ = lambda self: mock_events()
-    return mock_stream
+    return mock_chunks()
 
 
 def _patch_openai(mock_stream=None, side_effect=None):
@@ -37,9 +32,9 @@ def _patch_openai(mock_stream=None, side_effect=None):
             mock_get_client = p.start()
             mock_openai = AsyncMock()
             if side_effect:
-                mock_openai.chat.completions.stream = MagicMock(side_effect=side_effect)
+                mock_openai.chat.completions.create = AsyncMock(side_effect=side_effect)
             else:
-                mock_openai.chat.completions.stream = MagicMock(return_value=mock_stream)
+                mock_openai.chat.completions.create = AsyncMock(return_value=mock_stream)
             mock_get_client.return_value = mock_openai
             return mock_openai
 
@@ -108,11 +103,11 @@ async def test_chat_system_prompt_includes_user_goals(client, db):
 
     captured = []
 
-    def capture_stream(**kwargs):
+    async def capture_create(**kwargs):
         captured.append(kwargs)
         return mock_stream
 
-    with _patch_openai(side_effect=capture_stream):
+    with _patch_openai(side_effect=capture_create):
         with patch(
             "app.middleware.auth.decode_jwt",
             return_value=make_jwt_payload(user.email, supabase_id=sid),
