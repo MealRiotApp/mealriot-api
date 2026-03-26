@@ -35,7 +35,15 @@ async def list_friends(
         friend_id = f.addressee_id if f.requester_id == current_user.id else f.requester_id
         u = await db.get(User, friend_id)
         if u:
-            friends.append(FriendOut(user_id=str(u.id), username=u.username, name=u.name))
+            friends.append(FriendOut(
+                user_id=str(u.id),
+                username=u.username,
+                name=u.name,
+                avatar_url=u.avatar_url,
+                created_at=f.created_at.isoformat() if f.created_at else None,
+            ))
+    # Sort by created_at desc (newest friendships first)
+    friends.sort(key=lambda x: x.created_at or "", reverse=True)
     return friends
 
 

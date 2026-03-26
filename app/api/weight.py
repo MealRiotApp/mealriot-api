@@ -48,6 +48,28 @@ async def log_weight(
     return WeightEntry(id=str(log.id), date=today.isoformat(), weight_kg=float(log.weight_kg))
 
 
+@router.put("/{date_str}", response_model=WeightEntry)
+@limiter.limit("60/minute")
+async def update_weight(
+    request: Request,
+    date_str: str,
+    body: WeightLogRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    target = date.fromisoformat(date_str)
+    result = await db.execute(
+        select(WeightLog).where(WeightLog.user_id == current_user.id, WeightLog.date == target)
+    )
+    log = result.scalar_one_or_none()
+    if not log:
+        raise HTTPException(404, detail="Weight entry not found")
+    log.weight_kg = body.weight_kg
+    await db.commit()
+    await db.refresh(log)
+    return WeightEntry(id=str(log.id), date=target.isoformat(), weight_kg=float(log.weight_kg))
+
+
 @router.get("/history", response_model=WeightHistoryResponse)
 @limiter.limit("60/minute")
 async def get_weight_history(

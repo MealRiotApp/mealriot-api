@@ -1,3 +1,4 @@
+import uuid
 import pytest
 from unittest.mock import patch
 from tests.conftest import make_jwt_payload, make_active_user
@@ -119,3 +120,30 @@ async def test_points_week(client, db):
                                 headers={"Authorization": "Bearer faketoken"})
     assert resp.status_code == 200
     assert resp.json()["total_points"] == 0
+
+
+async def test_list_friends_includes_avatar_and_created_at(client, db):
+    from app.models.models import User, Friendship
+    user1, sid1 = await make_active_user(db, email="user1@test.com")
+    user2 = User(
+        supabase_id=str(uuid.uuid4()), email="user2@test.com", name="Friend",
+        role="member", status="active", avatar_url="https://example.com/avatar.jpg",
+    )
+    db.add(user2)
+    await db.commit()
+    await db.refresh(user2)
+
+    friendship = Friendship(requester_id=user1.id, addressee_id=user2.id, status="accepted")
+    db.add(friendship)
+    await db.commit()
+
+    with patch("app.middleware.auth.decode_jwt",
+               return_value=make_jwt_payload(user1.email, supabase_id=sid1)):
+        resp = await client.get("/api/v1/friends",
+                                headers={"Authorization": "Bearer faketoken"})
+
+    assert resp.status_code == 200
+    friends = resp.json()
+    assert len(friends) == 1
+    assert friends[0]["avatar_url"] == "https://example.com/avatar.jpg"
+    assert friends[0]["created_at"] is not None

@@ -274,3 +274,49 @@ async def delete_entry(db: AsyncSession, user_id: UUID, entry_id: UUID) -> None:
 
     await db.delete(entry)
     await db.commit()
+
+
+async def list_entries_paginated(
+    db: AsyncSession, user_id: UUID, limit: int = 20,
+    cursor_time: str | None = None, cursor_id: str | None = None,
+) -> dict:
+    """Return entries newest-first with compound cursor pagination (logged_at + id)."""
+    from sqlalchemy import or_, and_
+    stmt = (
+        select(FoodEntry)
+        .where(FoodEntry.user_id == user_id)
+        .order_by(FoodEntry.logged_at.desc(), FoodEntry.id.desc())
+        .limit(limit + 1)
+    )
+    if cursor_time and cursor_id:
+        from datetime import datetime as dt
+        import uuid as uuid_mod
+        cursor_dt = dt.fromisoformat(cursor_time)
+        cid = uuid_mod.UUID(cursor_id)
+        stmt = stmt.where(
+            or_(
+                FoodEntry.logged_at < cursor_dt,
+                and_(FoodEntry.logged_at == cursor_dt, FoodEntry.id < cid),
+            )
+        )
+
+    result = await db.execute(stmt)
+    entries = list(result.scalars().all())
+
+    has_more = len(entries) > limit
+    if has_more:
+        entries = entries[:limit]
+
+    next_cursor_time = None
+    next_cursor_id = None
+    if has_more and entries:
+        last = entries[-1]
+        next_cursor_time = last.logged_at.isoformat()
+        next_cursor_id = str(last.id)
+
+    return {
+        "entries": entries,
+        "next_cursor_time": next_cursor_time,
+        "next_cursor_id": next_cursor_id,
+        "has_more": has_more,
+    }

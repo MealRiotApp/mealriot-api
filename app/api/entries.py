@@ -8,7 +8,7 @@ from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.models.models import User
 from app.schemas.entry import EntryCreate, EntryUpdate, EntryOut, EntriesListResponse, DrinkSuggestion, EntryCreateResponse
-from app.services.entries_service import create_entry, list_entries_for_date, update_entry, delete_entry
+from app.services.entries_service import create_entry, list_entries_for_date, update_entry, delete_entry, list_entries_paginated
 from app.middleware.rate_limit import limiter
 
 router = APIRouter(prefix="/api/v1/entries", tags=["entries"])
@@ -62,6 +62,28 @@ async def list_for_day(
 ):
     entries = await list_entries_for_date(db, current_user.id, date)
     return EntriesListResponse(entries=entries)
+
+
+@router.get("/history")
+@limiter.limit("60/minute")
+async def entry_history(
+    request: Request,
+    limit: int = 20,
+    cursor_time: str | None = None,
+    cursor_id: str | None = None,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    if limit > 100:
+        limit = 100
+    result = await list_entries_paginated(db, current_user.id, limit, cursor_time, cursor_id)
+    entries_out = [EntryOut.model_validate(e).model_dump(mode="json") for e in result["entries"]]
+    return {
+        "entries": entries_out,
+        "next_cursor_time": result["next_cursor_time"],
+        "next_cursor_id": result["next_cursor_id"],
+        "has_more": result["has_more"],
+    }
 
 
 @router.patch("/{entry_id}", response_model=EntryOut)
