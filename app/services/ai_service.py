@@ -39,34 +39,28 @@ Rules:
 - Always return a JSON object with an "items" key containing the array.
 - Never include text outside the JSON."""
 
-_IMAGE_SYSTEM = """You are a precise food vision analyst. You MUST respond with valid JSON only.
+_IMAGE_SYSTEM_BASE = """You are a precise food vision analyst. You MUST respond with valid JSON only.
 
 Analyze the food image and identify every distinct food item visible.
 For each item, estimate portion size in grams using visual context:
   - Standard plate diameter (~26cm)
   - Visible utensils or hands for scale
-  - Food density and typical serving sizes
+  - Food density and typical serving sizes"""
 
+_IMAGE_SYSTEM_FOOTER = """
 Return the same JSON array structure as text parsing, plus a "visual_note" field per item.
 Include is_drink, volume_ml, and water_pct fields for any beverages visible.
 Flag confidence as "low" if items are obscured, stacked, or ambiguous."""
 
-_IMAGE_HINT_SYSTEM = """You are a precise food vision analyst. You MUST respond with valid JSON only.
+_IMAGE_SYSTEM = _IMAGE_SYSTEM_BASE + _IMAGE_SYSTEM_FOOTER
 
-Analyze the food image and identify every distinct food item visible.
-For each item, estimate portion size in grams using visual context:
-  - Standard plate diameter (~26cm)
-  - Visible utensils or hands for scale
-  - Food density and typical serving sizes
-
+_IMAGE_HINT_ADDON = """
 The user has provided a correction hint describing what is in the image.
 Prioritize the user's hint over your own visual analysis — use it to correct
 food identification, portion sizes, or any other detail. If the hint conflicts
-with what you see, trust the hint.
+with what you see, trust the hint."""
 
-Return the same JSON array structure as text parsing, plus a "visual_note" field per item.
-Include is_drink, volume_ml, and water_pct fields for any beverages visible.
-Flag confidence as "low" if items are obscured, stacked, or ambiguous."""
+_IMAGE_HINT_SYSTEM = _IMAGE_SYSTEM_BASE + _IMAGE_HINT_ADDON + _IMAGE_SYSTEM_FOOTER
 
 
 def _parse_json_response(content: str) -> list[dict]:
@@ -132,7 +126,7 @@ async def parse_food_image_with_hint(
         input=[
             {"role": "user", "content": [
                 {"type": "input_image", "image_url": f"data:{mime_type};base64,{b64}"},
-                {"type": "input_text", "text": hint},
+                {"type": "input_text", "text": f"Correction: {hint}"},
             ]},
         ],
         temperature=0,
