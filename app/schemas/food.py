@@ -7,9 +7,9 @@ class FoodItem(BaseModel):
     food_name_he: str | None = None
     grams: float
     calories: int
-    protein_g: float
-    fat_g: float
-    carbs_g: float
+    protein_g: float = 0.0
+    fat_g: float = 0.0
+    carbs_g: float = 0.0
     confidence: Literal["high", "medium", "low"] = "medium"
     is_drink: bool = False
     volume_ml: int | None = None

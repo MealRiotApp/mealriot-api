@@ -50,9 +50,24 @@ For each item, estimate portion size in grams using visual context:
   - Food density and typical serving sizes"""
 
 _IMAGE_SYSTEM_FOOTER = """
-Return the same JSON array structure as text parsing, plus a "visual_note" field per item.
-Include is_drink, volume_ml, and water_pct fields for any beverages visible.
-Flag confidence as "low" if items are obscured, stacked, or ambiguous."""
+
+For each food item, return a JSON object with these EXACT keys:
+  food_name (string, English)
+  food_name_he (string, Hebrew)
+  grams (number — estimated weight in grams. For beverages, use volume in ml)
+  calories (integer kcal — per ONE unit)
+  protein_g (number, 1 decimal — per ONE unit)
+  fat_g (number, 1 decimal — per ONE unit)
+  carbs_g (number, 1 decimal — per ONE unit)
+  confidence ("high", "medium", or "low" — flag "low" if items are obscured, stacked, or ambiguous)
+  visual_note (string — brief description of what you see)
+  is_drink (boolean — true if the item is a beverage)
+  volume_ml (integer — only when is_drink is true)
+  water_pct (integer 0-100 — only when is_drink is true)
+  quantity (integer — number of units visible, default 1. All nutritional values must be for ONE unit)
+
+Always return a JSON object with an "items" key containing the array.
+Never include text outside the JSON."""
 
 _IMAGE_SYSTEM = _IMAGE_SYSTEM_BASE + _IMAGE_SYSTEM_FOOTER
 
