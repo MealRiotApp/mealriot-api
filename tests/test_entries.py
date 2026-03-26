@@ -222,3 +222,66 @@ async def test_create_entry_with_quantity(client, db):
     assert entry["total_protein_g"] == 30.0
     assert entry["total_fat_g"] == 36.0
     assert entry["total_carbs_g"] == 75.0
+
+
+async def test_update_entry_regenerates_description(client, db):
+    user, sid = await make_active_user(db)
+
+    create_body = {
+        "description": "bread",
+        "source": "text",
+        "meal_type": "snack",
+        "items": [{"food_name": "Bread", "food_name_he": "לחם", "grams": 30,
+                   "calories": 79, "protein_g": 2.5, "fat_g": 0.8, "carbs_g": 15.1,
+                   "confidence": "high"}],
+    }
+
+    with patch("app.middleware.auth.decode_jwt",
+               return_value=make_jwt_payload(user.email, supabase_id=sid)):
+        create_resp = await client.post("/api/v1/entries", json=create_body,
+                                        headers={"Authorization": "Bearer faketoken"})
+        entry_id = create_resp.json()["entries"][0]["id"]
+
+        updated_items = [{"food_name": "Rice", "food_name_he": "אורז", "grams": 200,
+                          "calories": 260, "protein_g": 5.0, "fat_g": 0.5, "carbs_g": 57.0,
+                          "confidence": "high"}]
+        patch_resp = await client.patch(
+            f"/api/v1/entries/{entry_id}",
+            json={"items": updated_items},
+            headers={"Authorization": "Bearer faketoken"},
+        )
+
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["description"] == "Rice"
+
+
+async def test_update_entry_with_quantity_regenerates_description(client, db):
+    user, sid = await make_active_user(db)
+
+    create_body = {
+        "description": "pizza",
+        "source": "text",
+        "meal_type": "snack",
+        "items": [{"food_name": "Pizza Slice", "food_name_he": "משולש פיצה", "grams": 80,
+                   "calories": 250, "protein_g": 10.0, "fat_g": 12.0, "carbs_g": 25.0,
+                   "confidence": "medium", "quantity": 3}],
+    }
+
+    with patch("app.middleware.auth.decode_jwt",
+               return_value=make_jwt_payload(user.email, supabase_id=sid)):
+        create_resp = await client.post("/api/v1/entries", json=create_body,
+                                        headers={"Authorization": "Bearer faketoken"})
+        entry_id = create_resp.json()["entries"][0]["id"]
+
+        updated_items = [{"food_name": "Pizza Slice", "food_name_he": "משולש פיצה", "grams": 80,
+                          "calories": 250, "protein_g": 10.0, "fat_g": 12.0, "carbs_g": 25.0,
+                          "confidence": "medium", "quantity": 2}]
+        patch_resp = await client.patch(
+            f"/api/v1/entries/{entry_id}",
+            json={"items": updated_items},
+            headers={"Authorization": "Bearer faketoken"},
+        )
+
+    assert patch_resp.status_code == 200
+    assert patch_resp.json()["description"] == "Pizza Slice x2"
+    assert patch_resp.json()["total_calories"] == 500

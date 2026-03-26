@@ -229,6 +229,13 @@ async def update_entry(db: AsyncSession, user_id: UUID, entry_id: UUID, items: l
     entry.total_carbs_g = carbs
     entry.water_ml = new_water_ml
 
+    # Regenerate description from current items
+    if len(items) == 1:
+        entry.description = _item_description(items[0])
+    else:
+        # Legacy multi-item entries: join all item names
+        entry.description = ", ".join(_item_description(i) for i in items)
+
     # Update WaterLog if water amount changed
     water_diff = new_water_ml - old_water_ml
     if water_diff != 0:
