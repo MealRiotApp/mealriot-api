@@ -103,7 +103,7 @@ async def stream_chat(
                     yield f"data: {json.dumps({'token': event.delta})}\n\n"
 
         # Check for food extraction
-        _clean_text, foods = _extract_foods(full_text)
+        _, foods = _extract_foods(full_text)
         if foods:
             yield f"data: {json.dumps({'foods': foods})}\n\n"
 

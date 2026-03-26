@@ -5,7 +5,7 @@ from tests.conftest import make_jwt_payload, make_active_user
 from app.services.chat_service import _extract_foods
 
 
-def _make_mock_stream(text_chunks: list[str] = None):
+def _make_mock_stream(text_chunks: list[str] | None = None):
     """Build a mock OpenAI streaming context manager."""
     if text_chunks is None:
         text_chunks = ["Hello", " there"]
