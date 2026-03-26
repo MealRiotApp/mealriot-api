@@ -51,6 +51,23 @@ Return the same JSON array structure as text parsing, plus a "visual_note" field
 Include is_drink, volume_ml, and water_pct fields for any beverages visible.
 Flag confidence as "low" if items are obscured, stacked, or ambiguous."""
 
+_IMAGE_HINT_SYSTEM = """You are a precise food vision analyst. You MUST respond with valid JSON only.
+
+Analyze the food image and identify every distinct food item visible.
+For each item, estimate portion size in grams using visual context:
+  - Standard plate diameter (~26cm)
+  - Visible utensils or hands for scale
+  - Food density and typical serving sizes
+
+The user has provided a correction hint describing what is in the image.
+Prioritize the user's hint over your own visual analysis — use it to correct
+food identification, portion sizes, or any other detail. If the hint conflicts
+with what you see, trust the hint.
+
+Return the same JSON array structure as text parsing, plus a "visual_note" field per item.
+Include is_drink, volume_ml, and water_pct fields for any beverages visible.
+Flag confidence as "low" if items are obscured, stacked, or ambiguous."""
+
 
 def _parse_json_response(content: str) -> list[dict]:
     try:
@@ -75,36 +92,49 @@ def _parse_json_response(content: str) -> list[dict]:
 
 async def parse_food_text(text: str) -> list[dict]:
     client = _get_client()
-    response = await client.chat.completions.create(
+    response = await client.responses.create(
         model="gpt-4o",
-        messages=[
-            {"role": "system", "content": _TEXT_SYSTEM},
-            {"role": "user", "content": text},
+        instructions=_TEXT_SYSTEM,
+        input=[
+            {"role": "user", "content": [
+                {"type": "input_text", "text": text},
+            ]},
         ],
         temperature=0,
-        response_format={"type": "json_object"},
     )
-    return _parse_json_response(response.choices[0].message.content)
+    return _parse_json_response(response.output_text)
 
 
 async def parse_food_image(image_bytes: bytes, mime_type: str) -> list[dict]:
     client = _get_client()
     b64 = base64.b64encode(image_bytes).decode("utf-8")
-    response = await client.chat.completions.create(
+    response = await client.responses.create(
         model="gpt-4o",
-        messages=[
-            {"role": "system", "content": _IMAGE_SYSTEM},
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {"url": f"data:{mime_type};base64,{b64}"},
-                    }
-                ],
-            },
+        instructions=_IMAGE_SYSTEM,
+        input=[
+            {"role": "user", "content": [
+                {"type": "input_image", "image_url": f"data:{mime_type};base64,{b64}"},
+            ]},
         ],
         temperature=0,
-        max_tokens=1000,
     )
-    return _parse_json_response(response.choices[0].message.content)
+    return _parse_json_response(response.output_text)
+
+
+async def parse_food_image_with_hint(
+    image_bytes: bytes, mime_type: str, hint: str
+) -> list[dict]:
+    client = _get_client()
+    b64 = base64.b64encode(image_bytes).decode("utf-8")
+    response = await client.responses.create(
+        model="gpt-4o",
+        instructions=_IMAGE_HINT_SYSTEM,
+        input=[
+            {"role": "user", "content": [
+                {"type": "input_image", "image_url": f"data:{mime_type};base64,{b64}"},
+                {"type": "input_text", "text": hint},
+            ]},
+        ],
+        temperature=0,
+    )
+    return _parse_json_response(response.output_text)
