@@ -6,18 +6,18 @@ from app.services.chat_service import _extract_foods
 
 
 def _make_mock_stream(text_chunks: list[str] | None = None):
-    """Build a mock async iterable that mimics openai stream chunks."""
+    """Build a mock async iterable that mimics openai Responses API stream events."""
     if text_chunks is None:
         text_chunks = ["Hello", " there"]
 
-    async def mock_chunks():
+    async def mock_events():
         for text in text_chunks:
-            chunk = MagicMock()
-            chunk.choices = [MagicMock()]
-            chunk.choices[0].delta.content = text
-            yield chunk
+            event = MagicMock()
+            event.type = "response.output_text.delta"
+            event.delta = text
+            yield event
 
-    return mock_chunks()
+    return mock_events()
 
 
 def _patch_openai(mock_stream=None, side_effect=None):
@@ -32,9 +32,9 @@ def _patch_openai(mock_stream=None, side_effect=None):
             mock_get_client = p.start()
             mock_openai = AsyncMock()
             if side_effect:
-                mock_openai.chat.completions.create = AsyncMock(side_effect=side_effect)
+                mock_openai.responses.create = AsyncMock(side_effect=side_effect)
             else:
-                mock_openai.chat.completions.create = AsyncMock(return_value=mock_stream)
+                mock_openai.responses.create = AsyncMock(return_value=mock_stream)
             mock_get_client.return_value = mock_openai
             return mock_openai
 
@@ -120,8 +120,7 @@ async def test_chat_system_prompt_includes_user_goals(client, db):
 
     assert resp.status_code == 200
     assert len(captured) == 1
-    messages = captured[0]["messages"]
-    system_msg = messages[0]["content"]
+    system_msg = captured[0]["instructions"]
     assert "2000" in system_msg  # calorie goal
     assert "120" in system_msg  # protein goal
 
