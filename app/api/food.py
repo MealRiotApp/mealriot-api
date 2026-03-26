@@ -1,13 +1,14 @@
 import asyncio
 import uuid
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from supabase import create_client
 from app.api.deps import require_active_user
 from app.middleware.rate_limit import limiter
 from app.core.config import get_settings
 from app.models.models import User
-from app.schemas.food import ParseTextRequest, ParseTextResponse, ParseImageResponse, BarcodeResponse
-from app.services.ai_service import parse_food_text, parse_food_image
+from app.schemas.food import ParseTextRequest, ParseTextResponse, ParseImageResponse, BarcodeResponse, ReparseImageRequest
+from app.services.ai_service import parse_food_text, parse_food_image, parse_food_image_with_hint
 from app.services.barcode_service import lookup_barcode
 
 router = APIRouter(prefix="/api/v1/food", tags=["food"])
@@ -76,6 +77,35 @@ async def parse_image_route(
 
     items = await parse_food_image(image_bytes, image.content_type)
     return ParseImageResponse(image_url=image_url, items=items)
+
+
+@router.post("/re-parse-image", response_model=ParseTextResponse)
+@limiter.limit("10/minute")
+async def reparse_image_route(
+    request: Request,
+    body: ReparseImageRequest,
+    current_user: User = Depends(require_active_user),
+):
+    if not body.hint.strip():
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "INVALID_INPUT", "message": "Hint cannot be empty"}},
+        )
+
+    try:
+        async with httpx.AsyncClient(timeout=30) as http:
+            img_resp = await http.get(body.image_url)
+            img_resp.raise_for_status()
+    except httpx.HTTPError:
+        raise HTTPException(
+            status_code=400,
+            detail={"error": {"code": "IMAGE_FETCH_FAILED",
+                              "message": "Could not download the stored image"}},
+        )
+
+    mime_type = img_resp.headers.get("content-type", "image/jpeg")
+    items = await parse_food_image_with_hint(img_resp.content, mime_type, body.hint)
+    return ParseTextResponse(items=items)
 
 
 @router.get("/barcode/{barcode}", response_model=BarcodeResponse)

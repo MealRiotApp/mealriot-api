@@ -31,3 +31,8 @@ class ParseImageResponse(BaseModel):
 
 class BarcodeResponse(BaseModel):
     items: list[FoodItem]
+
+
+class ReparseImageRequest(BaseModel):
+    image_url: str
+    hint: str
