@@ -14,6 +14,7 @@ class FoodItem(BaseModel):
     is_drink: bool = False
     volume_ml: int | None = None
     water_pct: int | None = None
+    quantity: int = 1
 
 
 class ParseTextRequest(BaseModel):

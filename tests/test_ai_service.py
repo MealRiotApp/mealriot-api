@@ -1,3 +1,4 @@
+import json
 import pytest
 from unittest.mock import AsyncMock, patch, MagicMock
 
@@ -88,3 +89,29 @@ async def test_parse_image_with_hint_returns_items():
     content_types = [c["type"] for c in user_content]
     assert "input_image" in content_types
     assert "input_text" in content_types
+
+
+async def test_parse_text_with_quantity():
+    from app.services.ai_service import parse_food_text
+
+    mock_response = MagicMock()
+    mock_response.output_text = json.dumps({
+        "items": [
+            {"food_name": "Pizza Slice", "food_name_he": "משולש פיצה",
+             "grams": 80, "calories": 250, "protein_g": 10.0,
+             "fat_g": 12.0, "carbs_g": 25.0, "confidence": "medium",
+             "quantity": 3}
+        ]
+    })
+
+    with patch("app.services.ai_service._get_client") as mock_client_fn:
+        mock_client = AsyncMock()
+        mock_client.responses.create = AsyncMock(return_value=mock_response)
+        mock_client_fn.return_value = mock_client
+
+        items = await parse_food_text("שלוש משולשי פיצה")
+
+    assert len(items) == 1
+    assert items[0]["food_name"] == "Pizza Slice"
+    assert items[0]["quantity"] == 3
+    assert items[0]["calories"] == 250
