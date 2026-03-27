@@ -22,7 +22,6 @@ from app.api import water as water_module
 from app.api import weight as weight_module
 from app.api import drinks as drinks_module
 from app.api import goals as goals_module
-from app.api import insight as insight_module
 from app.api import eating_windows as eating_windows_module
 from app.api import chat as chat_module
 
@@ -79,7 +78,6 @@ app.include_router(water_module.router)
 app.include_router(weight_module.router)
 app.include_router(drinks_module.router)
 app.include_router(goals_module.router)
-app.include_router(insight_module.router)
 app.include_router(eating_windows_module.router)
 app.include_router(chat_module.router)
 
