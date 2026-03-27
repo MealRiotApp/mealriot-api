@@ -79,10 +79,25 @@ async def send_request(
     if ex:
         if ex.status == "accepted":
             raise HTTPException(409, detail={"error": {"code": "ALREADY_FRIENDS", "message": "Already friends"}})
-        if ex.status == "blocked":
+        elif ex.status == "blocked":
             raise HTTPException(422, detail={"error": {"code": "BLOCKED", "message": "Blocked"}})
-        if ex.status == "pending":
+        elif ex.status == "pending":
             raise HTTPException(409, detail={"error": {"code": "REQUEST_ALREADY_SENT", "message": "Request already sent"}})
+        elif ex.status == "declined":
+            # Check max friends limit
+            count = await db.execute(
+                select(func.count()).select_from(Friendship).where(
+                    Friendship.status == "accepted",
+                    or_(Friendship.requester_id == current_user.id, Friendship.addressee_id == current_user.id),
+                )
+            )
+            if count.scalar() >= 20:
+                raise HTTPException(400, detail={"error": {"code": "MAX_FRIENDS_REACHED", "message": "Max 20 friends"}})
+            ex.status = "pending"
+            ex.requester_id = current_user.id
+            ex.addressee_id = target.id
+            await db.commit()
+            return {"friendship_id": str(ex.id)}
 
     # Count friends limit
     count = await db.execute(
