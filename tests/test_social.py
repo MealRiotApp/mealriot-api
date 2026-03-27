@@ -36,8 +36,9 @@ async def test_search_user(client, db):
     user, sid = await make_active_user(db)
     user.username = "searchable"
     await db.commit()
+    searcher, searcher_sid = await make_active_user(db, email="searcher@test.com")
     with patch("app.middleware.auth.decode_jwt",
-               return_value=make_jwt_payload(user.email, supabase_id=sid)):
+               return_value=make_jwt_payload(searcher.email, supabase_id=searcher_sid)):
         resp = await client.get("/api/v1/friends/search?username=searchable",
                                 headers={"Authorization": "Bearer faketoken"})
     assert resp.status_code == 200

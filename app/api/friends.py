@@ -63,6 +63,9 @@ async def send_request(
     if not target:
         raise HTTPException(404, detail={"error": {"code": "USER_NOT_FOUND", "message": "User not found"}})
 
+    if target.id == current_user.id:
+        raise HTTPException(400, detail={"error": {"code": "CANNOT_FRIEND_SELF", "message": "Cannot send friend request to yourself"}})
+
     # Check existing
     existing = await db.execute(
         select(Friendship).where(
@@ -191,6 +194,8 @@ async def search_user(
     result = await db.execute(select(User).where(User.username == username))
     user = result.scalar_one_or_none()
     if not user:
+        return {"result": None}
+    if user.id == current_user.id:
         return {"result": None}
     # Check if blocked
     blocked = await db.execute(
