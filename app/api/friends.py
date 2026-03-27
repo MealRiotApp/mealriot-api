@@ -140,6 +140,21 @@ async def get_requests(
     return requests
 
 
+@router.get("/resolve")
+@limiter.limit("60/minute")
+async def resolve_friend_code(
+    request: Request,
+    code: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    result = await db.execute(select(User).where(User.friend_code == code))
+    user = result.scalar_one_or_none()
+    if not user:
+        raise HTTPException(404, detail={"error": {"code": "FRIEND_CODE_NOT_FOUND", "message": "Friend code not found"}})
+    return {"username": user.username, "name": user.name}
+
+
 @router.patch("/{friendship_id}")
 @limiter.limit("60/minute")
 async def respond_to_request(

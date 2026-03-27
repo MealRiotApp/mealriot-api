@@ -54,6 +54,34 @@ async def test_re_request_after_decline(client, db):
     assert updated.addressee_id == user_a.id
 
 
+async def test_resolve_friend_code(client, db):
+    user1, sid1 = await make_active_user(db, email="resolver@test.com")
+    user1.username = "resolver"
+    user2, sid2 = await make_active_user(db, email="target@test.com")
+    user2.username = "target_user"
+    user2.friend_code = "ABC1234567"
+    await db.commit()
+
+    with patch("app.middleware.auth.decode_jwt",
+               return_value=make_jwt_payload(user1.email, supabase_id=sid1)):
+        resp = await client.get("/api/v1/friends/resolve?code=ABC1234567",
+                                headers={"Authorization": "Bearer faketoken"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["username"] == "target_user"
+
+
+async def test_resolve_friend_code_not_found(client, db):
+    user, sid = await make_active_user(db)
+
+    with patch("app.middleware.auth.decode_jwt",
+               return_value=make_jwt_payload(user.email, supabase_id=sid)):
+        resp = await client.get("/api/v1/friends/resolve?code=NONEXISTENT",
+                                headers={"Authorization": "Bearer faketoken"})
+    assert resp.status_code == 404
+    assert resp.json()["error"]["code"] == "FRIEND_CODE_NOT_FOUND"
+
+
 async def test_search_excludes_self(client, db):
     user, sid = await make_active_user(db)
     user.username = "myself"
