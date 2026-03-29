@@ -33,8 +33,8 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
           script: |
+            set -e
             cd /opt/nutrilog
-            docker compose pull
-            docker compose up -d
+            flock /tmp/nutrilog-deploy.lock bash -c 'docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d'
             sleep 5
-            curl -f http://localhost:8000/health || echo "Health check failed!"
+            curl -sf https://localhost/health --insecure || echo "Health check failed!"
