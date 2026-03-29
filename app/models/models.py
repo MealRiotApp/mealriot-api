@@ -1,7 +1,7 @@
 import uuid
 import json
 from datetime import datetime, date as date_type, time as time_type
-from sqlalchemy import String, Integer, Numeric, Text, DateTime, JSON, Date, Time, func, UniqueConstraint, ForeignKey
+from sqlalchemy import String, Integer, Numeric, Text, Boolean, DateTime, JSON, Date, Time, func, UniqueConstraint, ForeignKey
 from sqlalchemy.types import TypeDecorator, CHAR
 from sqlalchemy.orm import Mapped, mapped_column
 from app.core.database import Base
@@ -242,3 +242,15 @@ class CustomDrink(Base):
     is_default: Mapped[bool] = mapped_column(default=False)
     use_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+
+
+class Announcement(Base):
+    __tablename__ = "announcements"
+
+    id: Mapped[str] = mapped_column(GUID(), primary_key=True, default=uuid.uuid4)
+    title: Mapped[str] = mapped_column(String(200), nullable=False)
+    body: Mapped[str | None] = mapped_column(Text, nullable=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True, server_default="1")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
