@@ -1,3 +1,4 @@
+from uuid import UUID
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -14,7 +15,7 @@ class AnnouncementUpdate(BaseModel):
 
 
 class AnnouncementOut(BaseModel):
-    id: str
+    id: UUID
     title: str
     body: str | None
     active: bool
