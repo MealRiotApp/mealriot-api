@@ -245,75 +245,6 @@ async def _scenario_no_friends_no_groups(db: AsyncSession, user: User) -> None:
     await _ensure_username(db, user)
 
 
-@scenario("has_friends_no_groups")
-async def _scenario_has_friends_no_groups(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 3)
-    await _create_friendships(db, user.id, friends, "accepted")
-
-
-@scenario("group_2_members")
-async def _scenario_group_2_members(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 1)
-    await _create_friendships(db, user.id, friends, "accepted")
-    all_ids = [user.id] + [f.id for f in friends]
-    await _create_group(db, "Test Duo", user.id, all_ids)
-    await _seed_points(db, all_ids, "random")
-
-
-@scenario("group_4_members")
-async def _scenario_group_4_members(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 3)
-    await _create_friendships(db, user.id, friends, "accepted")
-    all_ids = [user.id] + [f.id for f in friends]
-    await _create_group(db, "Test Squad", user.id, all_ids)
-    await _seed_points(db, all_ids, "random")
-
-
-@scenario("group_8_members")
-async def _scenario_group_8_members(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 7)
-    await _create_friendships(db, user.id, friends, "accepted")
-    all_ids = [user.id] + [f.id for f in friends]
-    await _create_group(db, "Test Octet", user.id, all_ids)
-    await _seed_points(db, all_ids, "random")
-
-
-@scenario("user_rank_1")
-async def _scenario_user_rank_1(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 3)
-    await _create_friendships(db, user.id, friends, "accepted")
-    all_ids = [user.id] + [f.id for f in friends]
-    await _create_group(db, "Test Rank1", user.id, all_ids)
-    await _seed_points(db, [user.id], "high")
-    await _seed_points(db, [f.id for f in friends], "low")
-
-
-@scenario("user_last_place")
-async def _scenario_user_last_place(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 3)
-    await _create_friendships(db, user.id, friends, "accepted")
-    all_ids = [user.id] + [f.id for f in friends]
-    await _create_group(db, "Test Last", user.id, all_ids)
-    await _seed_points(db, [user.id], "zero")
-    await _seed_points(db, [f.id for f in friends], "high")
-
-
-@scenario("all_tied_zero")
-async def _scenario_all_tied_zero(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 3)
-    await _create_friendships(db, user.id, friends, "accepted")
-    all_ids = [user.id] + [f.id for f in friends]
-    await _create_group(db, "Test Tied", user.id, all_ids)
-    # No points seeded — all tied at zero
-
-
 @scenario("pending_requests")
 async def _scenario_pending_requests(db: AsyncSession, user: User) -> None:
     await _ensure_username(db, user)
@@ -321,61 +252,39 @@ async def _scenario_pending_requests(db: AsyncSession, user: User) -> None:
     await _create_friendships(db, user.id, friends, "pending")
 
 
-@scenario("max_friends")
-async def _scenario_max_friends(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 20)
-    await _create_friendships(db, user.id, friends, "accepted")
-
-
-@scenario("has_friends_no_pending")
-async def _scenario_has_friends_no_pending(db: AsyncSession, user: User) -> None:
+@scenario("friends_with_points")
+async def _scenario_friends_with_points(db: AsyncSession, user: User) -> None:
     await _ensure_username(db, user)
     friends = await _ensure_fake_users(db, 5)
-    await _create_friendships(db, user.id, friends, "accepted")
+    await _create_friendships(db, user.id, friends)
+    await _seed_points(db, [user.id], "high")
+    await _seed_points(db, [friends[0].id], "high")
+    await _seed_points(db, [friends[1].id, friends[2].id], "random")
+    await _seed_points(db, [friends[3].id, friends[4].id], "low")
 
 
-@scenario("two_groups_max")
-async def _scenario_two_groups_max(db: AsyncSession, user: User) -> None:
+@scenario("friends_all_zero")
+async def _scenario_friends_all_zero(db: AsyncSession, user: User) -> None:
     await _ensure_username(db, user)
-    friends = await _ensure_fake_users(db, 3)
-    await _create_friendships(db, user.id, friends, "accepted")
-    # Group 1: user + friends[0] + friends[1]
-    g1_ids = [user.id, friends[0].id, friends[1].id]
-    await _create_group(db, "Test Alpha", user.id, g1_ids)
-    # Group 2: user + friends[1] + friends[2] (friends[1] overlaps)
-    g2_ids = [user.id, friends[1].id, friends[2].id]
-    await _create_group(db, "Test Beta", user.id, g2_ids)
+    friends = await _ensure_fake_users(db, 5)
+    await _create_friendships(db, user.id, friends)
+
+
+@scenario("one_friend")
+async def _scenario_one_friend(db: AsyncSession, user: User) -> None:
+    await _ensure_username(db, user)
+    friends = await _ensure_fake_users(db, 1)
+    await _create_friendships(db, user.id, friends)
+    await _seed_points(db, [user.id], "high")
+    await _seed_points(db, [friends[0].id], "random")
+
+
+@scenario("many_friends")
+async def _scenario_many_friends(db: AsyncSession, user: User) -> None:
+    await _ensure_username(db, user)
+    friends = await _ensure_fake_users(db, 15)
+    await _create_friendships(db, user.id, friends)
     await _seed_points(db, [user.id] + [f.id for f in friends], "random")
-
-
-@scenario("long_usernames")
-async def _scenario_long_usernames(db: AsyncSession, user: User) -> None:
-    await _ensure_username(db, user)
-    # Create 3 users with 30-char usernames
-    long_users: list[User] = []
-    for i in range(3):
-        uname = f"test_long_username_{i:011d}"  # exactly 30 chars
-        result = await db.execute(
-            select(User).where(User.username == uname)
-        )
-        u = result.scalar_one_or_none()
-        if not u:
-            u = User(
-                supabase_id=f"test-seed-{uname}",
-                email=f"long{i}@test.dev",
-                name=f"Long Name User {i}",
-                username=uname,
-                status="active",
-                friend_code=token_urlsafe(7)[:10],
-            )
-            db.add(u)
-            await db.flush()
-        long_users.append(u)
-    await _create_friendships(db, user.id, long_users, "accepted")
-    all_ids = [user.id] + [u.id for u in long_users]
-    await _create_group(db, "Test LongNames", user.id, all_ids)
-    await _seed_points(db, all_ids, "random")
 
 
 # ---------------------------------------------------------------------------
