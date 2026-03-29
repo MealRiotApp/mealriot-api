@@ -7,9 +7,12 @@ from app.models.models import User, Friendship, DailyPoints
 from tests.conftest import make_jwt_payload, make_active_user
 
 
-def _week_start() -> date:
+def _week_start(first_day_of_week: int = 0) -> date:
+    """Calculate week start respecting first_day_of_week (0=Sunday, 1=Monday)."""
     today = date.today()
-    return today - timedelta(days=today.weekday())
+    py_fdow = 6 if first_day_of_week == 0 else first_day_of_week - 1
+    days_since_start = (today.weekday() - py_fdow) % 7
+    return today - timedelta(days=days_since_start)
 
 
 async def _add_points(db, user_id, total_points: int, day_offset: int = 0):
@@ -144,4 +147,4 @@ async def test_leaderboard_has_week_start(client, db):
     assert resp.status_code == 200
     data = resp.json()
     week_start = date.fromisoformat(data["week_start"])
-    assert week_start.weekday() == 0  # Monday
+    assert week_start.weekday() == 6  # Sunday (default first_day_of_week=0)

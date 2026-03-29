@@ -165,7 +165,13 @@ async def friends_leaderboard(
     current_user: User = Depends(require_active_user),
 ):
     today = date.today()
-    week_start = today - timedelta(days=today.weekday())  # Monday
+    # Respect user's first_day_of_week setting (0=Sunday, 1=Monday)
+    fdow = getattr(current_user, "first_day_of_week", 1)
+    # Python weekday: Mon=0, Tue=1, ..., Sun=6
+    # Convert first_day_of_week to Python weekday: 0(Sun)->6, 1(Mon)->0
+    py_fdow = 6 if fdow == 0 else fdow - 1
+    days_since_start = (today.weekday() - py_fdow) % 7
+    week_start = today - timedelta(days=days_since_start)
     week_end = week_start + timedelta(days=6)
     days_in_week = min((today - week_start).days + 1, 7)
 
