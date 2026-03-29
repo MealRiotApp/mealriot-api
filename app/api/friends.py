@@ -1,13 +1,15 @@
 import secrets
+from datetime import date, timedelta
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_, and_, func
 from app.api.deps import require_active_user
 from app.core.database import get_db
-from app.models.models import User, Friendship
+from app.models.models import User, Friendship, DailyPoints
 from app.schemas.social import (
     FriendOut, FriendRequestOut, FriendRequestBody,
     FriendActionBody, UsernameSetBody,
+    LeaderboardResponse, StandingOut,
 )
 from app.middleware.rate_limit import limiter
 
@@ -153,6 +155,92 @@ async def resolve_friend_code(
     if not user:
         raise HTTPException(404, detail={"error": {"code": "FRIEND_CODE_NOT_FOUND", "message": "Friend code not found"}})
     return {"username": user.username, "name": user.name}
+
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
+@limiter.limit("60/minute")
+async def friends_leaderboard(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    today = date.today()
+    week_start = today - timedelta(days=today.weekday())  # Monday
+    week_end = week_start + timedelta(days=6)
+    days_in_week = min((today - week_start).days + 1, 7)
+
+    # Get accepted friend user IDs
+    stmt = select(Friendship).where(
+        Friendship.status == "accepted",
+        or_(
+            Friendship.requester_id == current_user.id,
+            Friendship.addressee_id == current_user.id,
+        ),
+    )
+    result = await db.execute(stmt)
+    friendships = result.scalars().all()
+
+    friend_ids = set()
+    for f in friendships:
+        friend_ids.add(f.addressee_id if f.requester_id == current_user.id else f.requester_id)
+
+    all_user_ids = list(friend_ids | {current_user.id})
+
+    # For each user, sum points and count days logged
+    standings_data = []
+    for uid in all_user_ids:
+        # Sum total_points for the week
+        pts_result = await db.execute(
+            select(func.coalesce(func.sum(DailyPoints.total_points), 0)).where(
+                DailyPoints.user_id == uid,
+                DailyPoints.date >= week_start,
+                DailyPoints.date <= week_end,
+            )
+        )
+        total_points = pts_result.scalar()
+
+        # Count distinct days with total_points > 0
+        days_result = await db.execute(
+            select(func.count(func.distinct(DailyPoints.date))).where(
+                DailyPoints.user_id == uid,
+                DailyPoints.date >= week_start,
+                DailyPoints.date <= week_end,
+                DailyPoints.total_points > 0,
+            )
+        )
+        days_logged = days_result.scalar()
+
+        user = await db.get(User, uid)
+        standings_data.append({
+            "user_id": str(uid),
+            "name": user.name if user else "Unknown",
+            "username": user.username if user else None,
+            "total_points": total_points,
+            "days_logged": days_logged,
+            "is_current_user": uid == current_user.id,
+        })
+
+    # Sort by (-total_points, -days_logged)
+    standings_data.sort(key=lambda x: (-x["total_points"], -x["days_logged"]))
+
+    # Assign ranks
+    standings = []
+    for i, s in enumerate(standings_data):
+        standings.append(StandingOut(
+            rank=i + 1,
+            user_id=s["user_id"],
+            name=s["name"],
+            username=s["username"],
+            total_points=s["total_points"],
+            days_logged=s["days_logged"],
+            days_in_week=days_in_week,
+            is_current_user=s["is_current_user"],
+        ))
+
+    return LeaderboardResponse(
+        week_start=week_start.isoformat(),
+        standings=standings,
+    )
 
 
 @router.patch("/{friendship_id}")
