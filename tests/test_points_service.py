@@ -215,3 +215,34 @@ async def test_update_entry_recalculates_points(db):
     dp = dp_result.scalar_one()
     # 1900 cal on 2000 goal = 95% = 6 calorie points
     assert dp.calorie_points == 6
+
+
+async def test_goal_change_recalculates_points(db):
+    from app.services.entries_service import create_entry
+    from app.services.points_service import recalculate_daily_points
+
+    user, _ = await make_active_user(db)
+    today = date(2026, 3, 30)
+
+    # Log entry with 1900 calories (95% of default 2000 goal = 6 cal pts)
+    await create_entry(db, user, {
+        "source": "text",
+        "meal_type": "lunch",
+        "items": [{"food_name": "Rice", "calories": 1900, "protein_g": 40,
+                    "fat_g": 20, "carbs_g": 300}],
+        "logged_at": datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc),
+    })
+    dp_result = await db.execute(
+        select(DailyPoints).where(DailyPoints.user_id == user.id, DailyPoints.date == today)
+    )
+    dp = dp_result.scalar_one()
+    assert dp.calorie_points == 6  # 95% of 2000
+
+    # Change goal to 3000 — now 1900/3000 = 63.3% = 2 cal pts
+    user.daily_cal_goal = 3000
+    await db.flush()
+
+    await recalculate_daily_points(db, user, target_date=today)
+    await db.refresh(dp)
+
+    assert dp.calorie_points == 2  # 63% of 3000
