@@ -1,10 +1,14 @@
+from datetime import date
+
 from fastapi import APIRouter, Depends, Request
 from pydantic import BaseModel, field_validator
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
 from app.api.deps import require_active_user
 from app.core.database import get_db
-from app.models.models import User
 from app.middleware.rate_limit import limiter
+from app.models.models import User, WeightLog
 
 router = APIRouter(prefix="/api/v1/goals", tags=["goals"])
 
@@ -173,6 +177,20 @@ async def calculate_goals(
     current_user.daily_carbs_goal_g = carbs_g
     current_user.daily_water_goal_ml = water_ml
     current_user.onboarding_done = True
+
+    # Seed weight tracking log so onboarding weight appears in history
+    today = date.today()
+    result = await db.execute(
+        select(WeightLog).where(
+            WeightLog.user_id == current_user.id, WeightLog.date == today
+        )
+    )
+    existing = result.scalar_one_or_none()
+    if existing:
+        existing.weight_kg = body.weight_kg
+    else:
+        db.add(WeightLog(user_id=current_user.id, date=today, weight_kg=body.weight_kg))
+
     await db.commit()
 
     return GoalCalculateResponse(
