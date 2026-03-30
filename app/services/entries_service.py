@@ -3,6 +3,7 @@ from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 from app.models.models import FoodEntry, RecentFood, User, WaterLog
+from app.services.points_service import recalculate_daily_points
 
 
 async def _update_streak(db: AsyncSession, user: User, today: date) -> None:
@@ -185,6 +186,7 @@ async def create_entry(db: AsyncSession, user: User, data: dict) -> dict:
 
     await _upsert_recent_foods(db, user.id, all_items)
     await _update_streak(db, user, today)
+    await recalculate_daily_points(db, user, target_date=today)
     await db.commit()
     for e in entries:
         await db.refresh(e)
@@ -249,6 +251,9 @@ async def update_entry(db: AsyncSession, user_id: UUID, entry_id: UUID, items: l
         elif water_diff > 0:
             db.add(WaterLog(user_id=user_id, date=entry_date, amount_ml=water_diff))
 
+    entry_date = entry.logged_at.date() if isinstance(entry.logged_at, datetime) else entry.logged_at
+    user = await db.get(User, user_id)
+    await recalculate_daily_points(db, user, target_date=entry_date)
     await db.commit()
     await db.refresh(entry)
     return entry
@@ -279,7 +284,11 @@ async def delete_entry(db: AsyncSession, user_id: UUID, entry_id: UUID) -> None:
         if wl:
             wl.amount_ml = max(0, wl.amount_ml - entry.water_ml)
 
+    entry_date = entry.logged_at.date() if hasattr(entry.logged_at, 'date') and callable(entry.logged_at.date) else entry.logged_at
+    user = await db.get(User, user_id)
     await db.delete(entry)
+    await db.flush()
+    await recalculate_daily_points(db, user, target_date=entry_date)
     await db.commit()
 
 

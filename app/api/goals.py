@@ -9,6 +9,7 @@ from app.api.deps import require_active_user
 from app.core.database import get_db
 from app.middleware.rate_limit import limiter
 from app.models.models import User, WeightLog
+from app.services.points_service import recalculate_daily_points
 
 router = APIRouter(prefix="/api/v1/goals", tags=["goals"])
 
@@ -191,6 +192,10 @@ async def calculate_goals(
     else:
         db.add(WeightLog(user_id=current_user.id, date=today, weight_kg=body.weight_kg))
 
+    await db.commit()
+
+    today = date.today()
+    await recalculate_daily_points(db, current_user, target_date=today)
     await db.commit()
 
     return GoalCalculateResponse(
