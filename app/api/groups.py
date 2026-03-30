@@ -147,6 +147,7 @@ async def get_leaderboard(
             "user_id": str(m.user_id),
             "name": user.name if user else "Unknown",
             "username": user.username if user else None,
+            "avatar_url": user.avatar_url if user else None,
             "total_points": total_pts,
             "days_logged": days_logged,
             "days_in_week": days_in_week,
