@@ -15,6 +15,22 @@ class FriendRequestOut(BaseModel):
     created_at: str
 
 
+class SentRequestOut(BaseModel):
+    friendship_id: str
+    addressee: FriendOut
+    created_at: str
+
+
+class FriendProfileOut(BaseModel):
+    user_id: str
+    name: str
+    username: str | None
+    avatar_url: str | None
+    joined: str
+    longest_streak: int
+    friends_since: str
+
+
 class FriendRequestBody(BaseModel):
     username: str
 
@@ -39,6 +55,7 @@ class StandingOut(BaseModel):
     user_id: str
     name: str
     username: str | None = None
+    avatar_url: str | None = None
     total_points: int
     days_logged: int
     days_in_week: int
