@@ -35,6 +35,7 @@ jobs:
           script: |
             set -e
             cd /opt/nutrilog
-            flock /tmp/nutrilog-deploy.lock bash -c 'docker compose -f docker-compose.prod.yml pull && docker compose -f docker-compose.prod.yml up -d'
+            flock /tmp/nutrilog-deploy.lock docker compose -f docker-compose.prod.yml pull
+            flock /tmp/nutrilog-deploy.lock docker compose -f docker-compose.prod.yml up -d
             sleep 5
             curl -sf https://localhost/health --insecure || echo "Health check failed!"
