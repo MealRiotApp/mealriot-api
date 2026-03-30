@@ -31,6 +31,7 @@ class ProfileOut(BaseModel):
 
 
 class ProfileUpdate(BaseModel):
+    name: str | None = None
     language: str | None = None
     theme: str | None = None
     daily_cal_goal: int | None = None

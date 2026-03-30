@@ -31,7 +31,7 @@ async def test_user_defaults(db):
     await db.commit()
     await db.refresh(user)
     assert user.role == "member"
-    assert user.status == "pending"
+    assert user.status == "active"
     assert user.theme == "ocean"
 
 

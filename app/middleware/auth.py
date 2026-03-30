@@ -1,8 +1,10 @@
 import httpx
+import random
 from fastapi import HTTPException, Header, Depends, Request
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.models import User, CustomDrink
@@ -57,8 +59,6 @@ async def get_current_user(
             result = await db.execute(select(User).where(User.supabase_id == supabase_id))
             user = result.scalar_one_or_none()
             if user:
-                if user.status == "pending":
-                    raise HTTPException(403, detail={"error": {"code": "PENDING_APPROVAL", "message": "Waiting for approval"}})
                 if user.status == "suspended":
                     raise HTTPException(403, detail={"error": {"code": "SUSPENDED", "message": "Account suspended"}})
                 request.state.user_id = str(user.id)
@@ -84,7 +84,7 @@ async def get_current_user(
     if user is None:
         settings = get_settings()
         role = "admin" if email == settings.admin_email else "member"
-        status = "active" if email == settings.admin_email else "pending"
+        status = "active"
         user = User(
             supabase_id=supabase_id,
             email=email,
@@ -119,20 +119,21 @@ async def get_current_user(
             import logging
             logging.getLogger(__name__).warning("Failed to seed default drink for user %s", user.id)
 
-        if status == "pending":
+        # Auto-set username from display name
+        base_username = name[:30]
+        for attempt in range(6):
+            candidate = base_username if attempt == 0 else f"{name[:28]}{random.randint(10, 99)}"
             try:
-                from app.services.notification_service import notify_admin_new_user
-                import asyncio
-                asyncio.create_task(notify_admin_new_user(name, email))
-            except Exception:
-                pass
+                user.username = candidate
+                await db.commit()
+                await db.refresh(user)
+                break
+            except IntegrityError:
+                await db.rollback()
+                # re-fetch user after rollback
+                result = await db.execute(select(User).where(User.supabase_id == supabase_id))
+                user = result.scalar_one()
 
-    if user.status == "pending":
-        raise HTTPException(
-            status_code=403,
-            detail={"error": {"code": "PENDING_APPROVAL",
-                              "message": "Your account is waiting for admin approval"}},
-        )
     if user.status == "suspended":
         raise HTTPException(
             status_code=403,
