@@ -27,15 +27,15 @@ jobs:
     if: ${{ vars.VPS_ENABLED == 'true' }}
     steps:
       - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            set -e
-            cd /opt/nutrilog
-            flock /tmp/nutrilog-deploy.lock docker compose -f docker-compose.prod.yml pull
-            flock /tmp/nutrilog-deploy.lock docker compose -f docker-compose.prod.yml up -d
-            sleep 5
-            curl -sf https://localhost/health --insecure || echo "Health check failed!"
+        run: |
+          echo "${{ secrets.VPS_SSH_KEY }}" > /tmp/deploy_key
+          chmod 600 /tmp/deploy_key
+          ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i /tmp/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
+          set -e
+          cd /opt/nutrilog
+          docker compose -f docker-compose.prod.yml pull
+          docker compose -f docker-compose.prod.yml up -d
+          sleep 5
+          curl -sf https://localhost/health --insecure || echo "Health check failed!"
+          ENDSSH
+          rm -f /tmp/deploy_key
