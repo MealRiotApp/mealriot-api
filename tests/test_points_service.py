@@ -246,3 +246,11 @@ async def test_goal_change_recalculates_points(db):
     await db.refresh(dp)
 
     assert dp.calorie_points == 2  # 63% of 3000
+
+
+async def test_compute_daily_points_endpoint_removed(client):
+    resp = await client.post(
+        "/internal/jobs/compute-daily-points",
+        headers={"x-internal-secret": "test"},
+    )
+    assert resp.status_code == 404
