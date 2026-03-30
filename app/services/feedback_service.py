@@ -46,7 +46,7 @@ async def send_feedback_email(
     html = _build_feedback_html(user_name, user_email, message, user_agent, screen_width, screen_height, page_url)
 
     msg = MIMEMultipart()
-    msg["Subject"] = f"NutriLog Feedback from {user_name}"
+    msg["Subject"] = f"MealRiot Feedback from {user_name}"
     msg["From"] = smtp_user
     msg["To"] = settings.admin_email
     msg.attach(MIMEText(html, "html"))

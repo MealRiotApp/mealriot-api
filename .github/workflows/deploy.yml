@@ -32,7 +32,7 @@ jobs:
           chmod 600 /tmp/deploy_key
           ssh -o StrictHostKeyChecking=no -o IdentitiesOnly=yes -i /tmp/deploy_key ${{ secrets.VPS_USER }}@${{ secrets.VPS_HOST }} << 'ENDSSH'
           set -e
-          cd /opt/nutrilog
+          cd /opt/mealriot
           docker compose -f docker-compose.prod.yml pull
           docker compose -f docker-compose.prod.yml up -d
           sleep 5

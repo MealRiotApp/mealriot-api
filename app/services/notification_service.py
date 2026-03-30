@@ -38,7 +38,7 @@ async def notify_admin_new_user(user_name: str, user_email: str) -> None:
     settings = get_settings()
     admin_email = settings.admin_email
 
-    subject = f"NutriLog: New user awaiting approval — {user_name}"
+    subject = f"MealRiot: New user awaiting approval — {user_name}"
     body = f"""
     <h2>New User Registration</h2>
     <p><strong>Name:</strong> {user_name}</p>
