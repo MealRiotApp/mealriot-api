@@ -22,7 +22,7 @@ def _get_client() -> AsyncOpenAI:
     return _client
 
 
-_SYSTEM_TEMPLATE = """You are NutriLog AI, a friendly and concise nutrition assistant.
+_SYSTEM_TEMPLATE = """You are MealRiot AI, a friendly and concise nutrition assistant.
 The user is tracking their food intake. Here is their context for today:
 
 Daily goals: {cal_goal} kcal, {protein_goal}g protein, {fat_goal}g fat, {carbs_goal}g carbs
