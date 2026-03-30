@@ -40,7 +40,7 @@ class User(Base):
     name: Mapped[str] = mapped_column(String, nullable=False)
     avatar_url: Mapped[str | None] = mapped_column(String)
     role: Mapped[str] = mapped_column(String, nullable=False, default="member")
-    status: Mapped[str] = mapped_column(String, nullable=False, default="pending")
+    status: Mapped[str] = mapped_column(String, nullable=False, default="active")
     language: Mapped[str] = mapped_column(String, nullable=False, default="en")
     theme: Mapped[str] = mapped_column(String, nullable=False, default="ocean")
     daily_cal_goal: Mapped[int | None] = mapped_column(Integer)
