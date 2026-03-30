@@ -140,3 +140,78 @@ async def test_recalculate_zero_entries(db):
     assert dp.logging_points == 0
     assert dp.macro_points == 0
     assert dp.total_points == 0
+
+
+async def test_create_entry_triggers_points(db):
+    from app.services.entries_service import create_entry
+
+    user, _ = await make_active_user(db)
+    today = date(2026, 3, 30)
+
+    await create_entry(db, user, {
+        "source": "text",
+        "meal_type": "lunch",
+        "items": [{"food_name": "Rice", "calories": 500, "protein_g": 10,
+                    "fat_g": 2, "carbs_g": 100}],
+        "logged_at": datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc),
+    })
+
+    result = await db.execute(
+        select(DailyPoints).where(DailyPoints.user_id == user.id, DailyPoints.date == today)
+    )
+    dp = result.scalar_one()
+    assert dp.logging_points == 1
+    assert dp.total_points > 0
+
+
+async def test_delete_entry_recalculates_points(db):
+    from app.services.entries_service import create_entry, delete_entry
+
+    user, _ = await make_active_user(db)
+    today = date(2026, 3, 30)
+
+    result = await create_entry(db, user, {
+        "source": "text",
+        "meal_type": "lunch",
+        "items": [{"food_name": "Rice", "calories": 500, "protein_g": 10,
+                    "fat_g": 2, "carbs_g": 100}],
+        "logged_at": datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc),
+    })
+    entry_id = result["entries"][0].id
+
+    await delete_entry(db, user.id, entry_id)
+
+    dp_result = await db.execute(
+        select(DailyPoints).where(DailyPoints.user_id == user.id, DailyPoints.date == today)
+    )
+    dp = dp_result.scalar_one()
+    assert dp.logging_points == 0
+    assert dp.total_points == 0
+
+
+async def test_update_entry_recalculates_points(db):
+    from app.services.entries_service import create_entry, update_entry
+
+    user, _ = await make_active_user(db)
+    today = date(2026, 3, 30)
+
+    result = await create_entry(db, user, {
+        "source": "text",
+        "meal_type": "lunch",
+        "items": [{"food_name": "Rice", "calories": 500, "protein_g": 10,
+                    "fat_g": 2, "carbs_g": 100}],
+        "logged_at": datetime(2026, 3, 30, 12, 0, tzinfo=timezone.utc),
+    })
+    entry_id = result["entries"][0].id
+
+    await update_entry(db, user.id, entry_id, [
+        {"food_name": "Big Rice", "calories": 1900, "protein_g": 40,
+         "fat_g": 5, "carbs_g": 400},
+    ])
+
+    dp_result = await db.execute(
+        select(DailyPoints).where(DailyPoints.user_id == user.id, DailyPoints.date == today)
+    )
+    dp = dp_result.scalar_one()
+    # 1900 cal on 2000 goal = 95% = 6 calorie points
+    assert dp.calorie_points == 6
