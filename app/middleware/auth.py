@@ -1,8 +1,10 @@
 import httpx
+import random
 from fastapi import HTTPException, Header, Depends, Request
 from jose import jwt, JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from app.core.config import get_settings
 from app.core.database import get_db
 from app.models.models import User, CustomDrink
@@ -116,6 +118,21 @@ async def get_current_user(
         except Exception:
             import logging
             logging.getLogger(__name__).warning("Failed to seed default drink for user %s", user.id)
+
+        # Auto-set username from display name
+        base_username = name[:30]
+        for attempt in range(6):
+            candidate = base_username if attempt == 0 else f"{name[:28]}{random.randint(10, 99)}"
+            try:
+                user.username = candidate
+                await db.commit()
+                await db.refresh(user)
+                break
+            except IntegrityError:
+                await db.rollback()
+                # re-fetch user after rollback
+                result = await db.execute(select(User).where(User.supabase_id == supabase_id))
+                user = result.scalar_one()
 
     if user.status == "suspended":
         raise HTTPException(

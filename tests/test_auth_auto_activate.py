@@ -39,3 +39,33 @@ async def test_admin_user_gets_admin_role(client, db):
     with patch("app.middleware.auth.decode_jwt", return_value=payload):
         resp = await client.get("/api/v1/profile", headers={"Authorization": "Bearer fake"})
     assert resp.status_code == 200
+
+
+async def test_new_user_gets_username_from_display_name(client, db):
+    """New users should get their display name as username."""
+    payload = make_jwt_payload("nameuser@test.com")
+    payload["user_metadata"]["full_name"] = "Alice Smith"
+    with patch("app.middleware.auth.decode_jwt", return_value=payload):
+        resp = await client.get("/api/v1/profile", headers={"Authorization": "Bearer fake"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["username"] == "Alice Smith"
+
+
+async def test_username_collision_appends_number(client, db):
+    """If username is taken, append a random number."""
+    # Create first user with username "Duplicate Name"
+    user1, _ = await make_active_user(db, email="first@test.com")
+    user1.username = "Duplicate Name"
+    db.add(user1)
+    await db.commit()
+
+    payload = make_jwt_payload("second@test.com")
+    payload["user_metadata"]["full_name"] = "Duplicate Name"
+    with patch("app.middleware.auth.decode_jwt", return_value=payload):
+        resp = await client.get("/api/v1/profile", headers={"Authorization": "Bearer fake"})
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["username"] is not None
+    assert data["username"].startswith("Duplicate Name")
+    assert data["username"] != "Duplicate Name"  # should have a suffix
