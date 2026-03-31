@@ -21,15 +21,17 @@ For each food item identified, return an object with:
   food_name (string, English)
   food_name_he (string, Hebrew)
   grams (number — per-unit weight. Use exact value if user specified, otherwise estimate. For beverages, use volume in ml)
-  calories (integer kcal — per ONE unit)
-  protein_g (number, 1 decimal — per ONE unit)
-  fat_g (number, 1 decimal — per ONE unit)
-  carbs_g (number, 1 decimal — per ONE unit)
+  calories_per_100g (integer kcal per 100 grams)
+  protein_per_100g (number, 1 decimal — grams of protein per 100g)
+  fat_per_100g (number, 1 decimal — grams of fat per 100g)
+  carbs_per_100g (number, 1 decimal — grams of carbs per 100g)
   confidence ("high" if grams were explicit, "medium" if estimated from portion, "low" if uncertain)
   is_drink (boolean — true if the item is a beverage: coffee, tea, juice, cocktail, beer, wine, soda, smoothie, water, milk, energy drink, etc.)
   volume_ml (integer — only when is_drink is true, volume in milliliters per ONE unit)
   water_pct (integer 0-100 — only when is_drink is true, percentage that counts as water intake. Examples: water=100, coffee/tea=95, beer=92, wine=85, juice=85, soda=90, milk=87)
-  quantity (integer — number of units. When the user specifies a count like "3 slices", "שלוש משולשי פיצה", "2 cups of coffee", set this to that number. All nutritional values above must be for ONE unit. Default to 1 if no count specified)
+  quantity (integer — number of units. When the user specifies a count like "3 slices", "שלוש משולשי פיצה", "2 cups of coffee", set this to that number. Default to 1 if no count specified)
+
+All nutritional values (calories, protein, fat, carbs) MUST be per 100 grams. The system will scale them to the actual portion weight.
 
 Rules:
 - If grams are explicit (e.g. "150 גרם"), use that exactly.
@@ -55,16 +57,18 @@ For each food item, return a JSON object with these EXACT keys:
   food_name (string, English)
   food_name_he (string, Hebrew)
   grams (number — estimated weight in grams. For beverages, use volume in ml)
-  calories (integer kcal — per ONE unit)
-  protein_g (number, 1 decimal — per ONE unit)
-  fat_g (number, 1 decimal — per ONE unit)
-  carbs_g (number, 1 decimal — per ONE unit)
+  calories_per_100g (integer kcal per 100 grams)
+  protein_per_100g (number, 1 decimal — grams of protein per 100g)
+  fat_per_100g (number, 1 decimal — grams of fat per 100g)
+  carbs_per_100g (number, 1 decimal — grams of carbs per 100g)
   confidence ("high", "medium", or "low" — flag "low" if items are obscured, stacked, or ambiguous)
   visual_note (string — brief description of what you see)
   is_drink (boolean — true if the item is a beverage)
   volume_ml (integer — only when is_drink is true)
   water_pct (integer 0-100 — only when is_drink is true)
-  quantity (integer — number of units visible, default 1. All nutritional values must be for ONE unit)
+  quantity (integer — number of units visible, default 1)
+
+All nutritional values (calories, protein, fat, carbs) MUST be per 100 grams. The system will scale them to the actual portion weight.
 
 Always return a JSON object with an "items" key containing the array.
 Never include text outside the JSON."""
@@ -101,6 +105,18 @@ def _parse_json_response(content: str) -> list[dict]:
         )
 
 
+def _scale_per_100g_to_total(items: list[dict]) -> list[dict]:
+    """Convert per-100g nutrition values from AI to total values based on actual grams."""
+    for item in items:
+        grams = item.get("grams", 100)
+        ratio = grams / 100
+        item["calories"] = round(item.pop("calories_per_100g", 0) * ratio)
+        item["protein_g"] = round(item.pop("protein_per_100g", 0) * ratio, 1)
+        item["fat_g"] = round(item.pop("fat_per_100g", 0) * ratio, 1)
+        item["carbs_g"] = round(item.pop("carbs_per_100g", 0) * ratio, 1)
+    return items
+
+
 async def parse_food_text(text: str) -> list[dict]:
     client = _get_client()
     response = await client.responses.create(
@@ -113,7 +129,7 @@ async def parse_food_text(text: str) -> list[dict]:
         ],
         temperature=0,
     )
-    return _parse_json_response(response.output_text)
+    return _scale_per_100g_to_total(_parse_json_response(response.output_text))
 
 
 async def parse_food_image(image_bytes: bytes, mime_type: str) -> list[dict]:
@@ -129,7 +145,7 @@ async def parse_food_image(image_bytes: bytes, mime_type: str) -> list[dict]:
         ],
         temperature=0,
     )
-    return _parse_json_response(response.output_text)
+    return _scale_per_100g_to_total(_parse_json_response(response.output_text))
 
 
 async def parse_food_image_with_hint(
@@ -148,4 +164,4 @@ async def parse_food_image_with_hint(
         ],
         temperature=0,
     )
-    return _parse_json_response(response.output_text)
+    return _scale_per_100g_to_total(_parse_json_response(response.output_text))
