@@ -10,6 +10,7 @@ from app.schemas.social import (
     FriendOut, FriendRequestOut, FriendRequestBody,
     FriendActionBody, UsernameSetBody,
     LeaderboardResponse, StandingOut,
+    SentRequestOut, FriendProfileOut,
 )
 from app.middleware.rate_limit import limiter
 
@@ -142,6 +143,57 @@ async def get_requests(
     return requests
 
 
+@router.get("/requests/sent", response_model=list[SentRequestOut])
+@limiter.limit("60/minute")
+async def get_sent_requests(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    result = await db.execute(
+        select(Friendship).where(
+            Friendship.requester_id == current_user.id,
+            Friendship.status == "pending",
+        )
+    )
+    sent = []
+    for f in result.scalars().all():
+        u = await db.get(User, f.addressee_id)
+        if u:
+            sent.append(SentRequestOut(
+                friendship_id=str(f.id),
+                addressee=FriendOut(
+                    user_id=str(u.id),
+                    username=u.username,
+                    name=u.name,
+                    avatar_url=u.avatar_url,
+                ),
+                created_at=f.created_at.isoformat() if f.created_at else "",
+            ))
+    return sent
+
+
+@router.delete("/requests/{friendship_id}", status_code=204)
+@limiter.limit("60/minute")
+async def cancel_request(
+    request: Request,
+    friendship_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    import uuid as uuid_mod
+    result = await db.execute(
+        select(Friendship).where(Friendship.id == uuid_mod.UUID(friendship_id))
+    )
+    f = result.scalar_one_or_none()
+    if not f or f.status != "pending":
+        raise HTTPException(404, detail="Request not found")
+    if f.requester_id != current_user.id:
+        raise HTTPException(403, detail="Only the sender can cancel a request")
+    await db.delete(f)
+    await db.commit()
+
+
 @router.get("/resolve")
 @limiter.limit("60/minute")
 async def resolve_friend_code(
@@ -221,6 +273,7 @@ async def friends_leaderboard(
             "user_id": str(uid),
             "name": user.name if user else "Unknown",
             "username": user.username if user else None,
+            "avatar_url": user.avatar_url if user else None,
             "total_points": total_points,
             "days_logged": days_logged,
             "is_current_user": uid == current_user.id,
@@ -237,6 +290,7 @@ async def friends_leaderboard(
             user_id=s["user_id"],
             name=s["name"],
             username=s["username"],
+            avatar_url=s["avatar_url"],
             total_points=s["total_points"],
             days_logged=s["days_logged"],
             days_in_week=days_in_week,
@@ -351,3 +405,72 @@ async def set_username(
         current_user.friend_code = secrets.token_urlsafe(7)[:10]
     await db.commit()
     return {"username": current_user.username, "friend_code": current_user.friend_code}
+
+
+@router.delete("/{user_id}", status_code=204)
+@limiter.limit("60/minute")
+async def remove_friend(
+    request: Request,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    import uuid as uuid_mod
+    target_id = uuid_mod.UUID(user_id)
+    result = await db.execute(
+        select(Friendship).where(
+            Friendship.status == "accepted",
+            or_(
+                and_(Friendship.requester_id == current_user.id, Friendship.addressee_id == target_id),
+                and_(Friendship.requester_id == target_id, Friendship.addressee_id == current_user.id),
+            ),
+        )
+    )
+    friendship = result.scalar_one_or_none()
+    if not friendship:
+        raise HTTPException(404, detail="Not friends")
+    await db.delete(friendship)
+    await db.commit()
+
+
+@router.get("/{user_id}/profile", response_model=FriendProfileOut)
+@limiter.limit("60/minute")
+async def get_friend_profile(
+    request: Request,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    import uuid as uuid_mod
+    target_id = uuid_mod.UUID(user_id)
+
+    # Verify accepted friendship exists
+    result = await db.execute(
+        select(Friendship).where(
+            Friendship.status == "accepted",
+            or_(
+                and_(Friendship.requester_id == current_user.id, Friendship.addressee_id == target_id),
+                and_(Friendship.requester_id == target_id, Friendship.addressee_id == current_user.id),
+            ),
+        )
+    )
+    friendship = result.scalar_one_or_none()
+    if not friendship:
+        raise HTTPException(403, detail="Not friends")
+
+    target = await db.get(User, target_id)
+    if not target:
+        raise HTTPException(404, detail="User not found")
+
+    joined = target.created_at.strftime("%b '%y") if target.created_at else "Unknown"
+    friends_since = friendship.created_at.strftime("%b '%y") if friendship.created_at else "Unknown"
+
+    return FriendProfileOut(
+        user_id=str(target.id),
+        name=target.name,
+        username=target.username,
+        avatar_url=target.avatar_url,
+        joined=joined,
+        longest_streak=target.longest_streak or 0,
+        friends_since=friends_since,
+    )
