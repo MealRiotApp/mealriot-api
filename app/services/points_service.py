@@ -9,18 +9,18 @@ from app.models.models import DailyPoints, FoodEntry, User
 def calc_calorie_points(total_cal: int, goal: int) -> int:
     if goal == 0:
         return 0
+    if total_cal == 0:
+        return 0
     pct = total_cal / goal
     if 0.9 <= pct <= 1.1:
-        return 6
+        return 10
     if 0.75 <= pct < 0.9:
-        return 4
+        return 7
     if 1.1 < pct <= 1.25:
-        return 3
+        return 5
     if 0.5 <= pct < 0.75:
-        return 2
-    if pct > 1.25:
-        return 1
-    return 0
+        return 3
+    return 1
 
 
 def calc_macro_points(
@@ -30,20 +30,17 @@ def calc_macro_points(
 ) -> int:
     if not macro_bonus_enabled:
         return 0
-    pts = 0
+    pts = 0.0
     if protein_goal and protein_goal > 0:
         if 0.85 <= protein / protein_goal <= 1.15:
-            pts += 1
-    other_hit = False
+            pts += 2.0
     if fat_goal and fat_goal > 0:
         if 0.85 <= fat / fat_goal <= 1.15:
-            other_hit = True
-    if not other_hit and carbs_goal and carbs_goal > 0:
+            pts += 1.5
+    if carbs_goal and carbs_goal > 0:
         if 0.85 <= carbs / carbs_goal <= 1.15:
-            other_hit = True
-    if other_hit:
-        pts += 1
-    return pts
+            pts += 1.5
+    return round(pts)
 
 
 async def recalculate_daily_points(
@@ -73,7 +70,7 @@ async def recalculate_daily_points(
 
     goal = user.daily_cal_goal or 2000
     cal_pts = calc_calorie_points(total_cal, goal)
-    log_pts = min(entry_count, 2)
+    log_pts = entry_count
     macro_pts = calc_macro_points(
         protein=total_protein, fat=total_fat, carbs=total_carbs,
         protein_goal=user.daily_protein_goal_g,
