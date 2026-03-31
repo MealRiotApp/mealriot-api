@@ -120,6 +120,13 @@ def _calc_macros_protein_first(daily_cal: int, weight_kg: float, goal: str, pres
         carbs_g = max(50, round((daily_cal - protein_g * 4 - fat_g * 9) / 4))
         return protein_g, fat_g, carbs_g
 
+    if preset == "flexible":
+        protein_g = round(weight_kg * 0.8)
+        fat_g = round(daily_cal * 0.30 / 9)
+        remaining_cal = daily_cal - (protein_g * 4) - (fat_g * 9)
+        carbs_g = max(50, round(remaining_cal / 4))
+        return protein_g, fat_g, carbs_g
+
     # balanced (default) — protein-first
     protein_per_kg = PROTEIN_PER_KG.get(goal, 1.4)
     protein_g = round(weight_kg * protein_per_kg)
@@ -178,6 +185,10 @@ async def calculate_goals(
     current_user.daily_carbs_goal_g = carbs_g
     current_user.daily_water_goal_ml = water_ml
     current_user.onboarding_done = True
+    current_user.sex = body.sex
+    current_user.goal = body.goal
+    current_user.body_fat_pct = body.body_fat_pct
+    current_user.macro_preset = body.macro_preset
 
     # Seed weight tracking log so onboarding weight appears in history
     today = date.today()
