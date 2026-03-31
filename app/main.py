@@ -89,3 +89,27 @@ app.include_router(feedback_module.router)
 @limiter.exempt
 async def health():
     return {"status": "ok"}
+
+
+import os
+import subprocess
+
+def _get_version() -> str:
+    v = os.environ.get("APP_VERSION")
+    if v:
+        return v
+    try:
+        commit = subprocess.check_output(
+            ["git", "rev-parse", "--short", "HEAD"], stderr=subprocess.DEVNULL
+        ).decode().strip()
+        return commit
+    except Exception:
+        return "unknown"
+
+_app_version = _get_version()
+
+
+@app.get("/api/v1/health")
+@limiter.exempt
+async def health_v1():
+    return {"status": "ok", "version": _app_version}
