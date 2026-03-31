@@ -8,19 +8,19 @@ from tests.conftest import make_active_user
 
 
 async def test_calorie_points_perfect():
-    assert calc_calorie_points(1900, 2000) == 6  # 95% = in 90-110%
+    assert calc_calorie_points(1900, 2000) == 10  # 95% = in 90-110%
 
 
 async def test_calorie_points_moderate_under():
-    assert calc_calorie_points(1600, 2000) == 4  # 80% = in 75-89%
+    assert calc_calorie_points(1600, 2000) == 7  # 80% = in 75-89%
 
 
 async def test_calorie_points_slight_over():
-    assert calc_calorie_points(2300, 2000) == 3  # 115% = in 110-125%
+    assert calc_calorie_points(2300, 2000) == 5  # 115% = in 110-125%
 
 
 async def test_calorie_points_low():
-    assert calc_calorie_points(1200, 2000) == 2  # 60% = in 50-74%
+    assert calc_calorie_points(1200, 2000) == 3  # 60% = in 50-74%
 
 
 async def test_calorie_points_way_over():
@@ -28,35 +28,51 @@ async def test_calorie_points_way_over():
 
 
 async def test_calorie_points_almost_nothing():
-    assert calc_calorie_points(200, 2000) == 0  # 10% = <50%
+    assert calc_calorie_points(200, 2000) == 1  # 10% = outside all ranges
 
 
 async def test_calorie_points_zero_goal():
     assert calc_calorie_points(500, 0) == 0
 
 
-async def test_macro_points_protein_hit():
+async def test_macro_points_all_hit():
     assert calc_macro_points(
-        protein=110, fat=20, carbs=100,
+        protein=110, fat=75, carbs=170,
         protein_goal=120, fat_goal=78, carbs_goal=180,
         macro_bonus_enabled=True,
-    ) == 1
+    ) == 5  # 2 + 1.5 + 1.5 = 5
 
 
-async def test_macro_points_protein_and_fat_hit():
+async def test_macro_points_protein_only():
     assert calc_macro_points(
-        protein=115, fat=75, carbs=100,
+        protein=110, fat=20, carbs=100,
         protein_goal=120, fat_goal=78, carbs_goal=180,
         macro_bonus_enabled=True,
     ) == 2
 
 
-async def test_macro_points_protein_miss_carbs_hit():
+async def test_macro_points_fat_only():
+    assert calc_macro_points(
+        protein=50, fat=75, carbs=100,
+        protein_goal=120, fat_goal=78, carbs_goal=180,
+        macro_bonus_enabled=True,
+    ) == 2  # 1.5 rounds to 2
+
+
+async def test_macro_points_carbs_only():
     assert calc_macro_points(
         protein=50, fat=20, carbs=170,
         protein_goal=120, fat_goal=78, carbs_goal=180,
         macro_bonus_enabled=True,
-    ) == 1
+    ) == 2  # 1.5 rounds to 2
+
+
+async def test_macro_points_protein_and_fat():
+    assert calc_macro_points(
+        protein=110, fat=75, carbs=100,
+        protein_goal=120, fat_goal=78, carbs_goal=180,
+        macro_bonus_enabled=True,
+    ) == 4  # 2 + 1.5 = 3.5 rounds to 4
 
 
 async def test_macro_points_disabled():
@@ -213,8 +229,8 @@ async def test_update_entry_recalculates_points(db):
         select(DailyPoints).where(DailyPoints.user_id == user.id, DailyPoints.date == today)
     )
     dp = dp_result.scalar_one()
-    # 1900 cal on 2000 goal = 95% = 6 calorie points
-    assert dp.calorie_points == 6
+    # 1900 cal on 2000 goal = 95% = 10 calorie points
+    assert dp.calorie_points == 10
 
 
 async def test_goal_change_recalculates_points(db):
@@ -224,7 +240,7 @@ async def test_goal_change_recalculates_points(db):
     user, _ = await make_active_user(db)
     today = date(2026, 3, 30)
 
-    # Log entry with 1900 calories (95% of default 2000 goal = 6 cal pts)
+    # Log entry with 1900 calories (95% of default 2000 goal = 10 cal pts)
     await create_entry(db, user, {
         "source": "text",
         "meal_type": "lunch",
@@ -236,16 +252,16 @@ async def test_goal_change_recalculates_points(db):
         select(DailyPoints).where(DailyPoints.user_id == user.id, DailyPoints.date == today)
     )
     dp = dp_result.scalar_one()
-    assert dp.calorie_points == 6  # 95% of 2000
+    assert dp.calorie_points == 10  # 95% of 2000
 
-    # Change goal to 3000 — now 1900/3000 = 63.3% = 2 cal pts
+    # Change goal to 3000 — now 1900/3000 = 63.3% = 3 cal pts
     user.daily_cal_goal = 3000
     await db.flush()
 
     await recalculate_daily_points(db, user, target_date=today)
     await db.refresh(dp)
 
-    assert dp.calorie_points == 2  # 63% of 3000
+    assert dp.calorie_points == 3  # 63% of 3000
 
 
 async def test_compute_daily_points_endpoint_removed(client):
@@ -254,3 +270,22 @@ async def test_compute_daily_points_endpoint_removed(client):
         headers={"x-internal-secret": "test"},
     )
     assert resp.status_code == 404
+
+
+async def test_logging_points_uncapped(db):
+    from app.services.points_service import recalculate_daily_points
+
+    user, _ = await make_active_user(db)
+    today = date(2026, 3, 30)
+
+    for i in range(10):
+        db.add(FoodEntry(
+            user_id=user.id, description=f"Meal {i}", source="text",
+            meal_type="lunch", items=[{"food_name": f"Meal {i}"}],
+            total_calories=100, total_protein_g=5, total_fat_g=2, total_carbs_g=15,
+            logged_at=datetime(2026, 3, 30, 8 + i, 0, tzinfo=timezone.utc),
+        ))
+    await db.flush()
+
+    dp = await recalculate_daily_points(db, user, target_date=today)
+    assert dp.logging_points == 10
