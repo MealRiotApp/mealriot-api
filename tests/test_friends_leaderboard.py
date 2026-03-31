@@ -148,3 +148,44 @@ async def test_leaderboard_has_week_start(client, db):
     data = resp.json()
     week_start = date.fromisoformat(data["week_start"])
     assert week_start.weekday() == 6  # Sunday (default first_day_of_week=0)
+
+
+async def test_leaderboard_tied_ranks(client, db):
+    """Users with the same total_points should share the same rank."""
+    user, sid = await make_active_user(db, "tie_me@test.com")
+    user.username = "tie_user"
+    await db.flush()
+
+    friends = []
+    for i in range(3):
+        f = User(
+            supabase_id=str(uuid.uuid4()), email=f"tie_f{i}@test.com",
+            name=f"Tie Friend {i}", username=f"tie_friend_{i}", status="active",
+        )
+        db.add(f)
+        friends.append(f)
+    await db.flush()
+
+    for f in friends:
+        db.add(Friendship(requester_id=user.id, addressee_id=f.id, status="accepted"))
+    await db.flush()
+
+    await _add_points(db, user.id, 30, day_offset=0)
+    await _add_points(db, friends[0].id, 30, day_offset=0)
+    await _add_points(db, friends[1].id, 20, day_offset=0)
+    await _add_points(db, friends[2].id, 20, day_offset=0)
+    await db.commit()
+
+    payload = make_jwt_payload("tie_me@test.com", sid)
+    with patch("app.middleware.auth.decode_jwt", return_value=payload):
+        resp = await client.get("/api/v1/friends/leaderboard", headers={"Authorization": "Bearer fake"})
+
+    assert resp.status_code == 200
+    standings = resp.json()["standings"]
+    assert len(standings) == 4
+
+    ranks_30 = [s["rank"] for s in standings if s["total_points"] == 30]
+    assert ranks_30 == [1, 1]
+
+    ranks_20 = [s["rank"] for s in standings if s["total_points"] == 20]
+    assert ranks_20 == [2, 2]

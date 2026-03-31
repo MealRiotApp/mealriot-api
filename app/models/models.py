@@ -65,6 +65,11 @@ class User(Base):
     onboarding_done: Mapped[bool] = mapped_column(default=False)
     use_24h: Mapped[bool] = mapped_column(default=True)
     first_day_of_week: Mapped[int] = mapped_column(Integer, nullable=False, default=0)  # 0=Sunday, 1=Monday
+    home_view_mode: Mapped[str] = mapped_column(String, nullable=False, default="compact")
+    sex: Mapped[str | None] = mapped_column(String)
+    goal: Mapped[str | None] = mapped_column(String)
+    body_fat_pct: Mapped[float | None] = mapped_column(Numeric(5, 2))
+    macro_preset: Mapped[str | None] = mapped_column(String)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 
