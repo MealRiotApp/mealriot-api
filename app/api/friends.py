@@ -282,11 +282,16 @@ async def friends_leaderboard(
     # Sort by (-total_points, -days_logged)
     standings_data.sort(key=lambda x: (-x["total_points"], -x["days_logged"]))
 
-    # Assign ranks
+    # Assign ranks — dense ranking (ties share rank, no gaps)
     standings = []
-    for i, s in enumerate(standings_data):
+    current_rank = 0
+    prev_points = None
+    for s in standings_data:
+        if s["total_points"] != prev_points:
+            current_rank += 1
+            prev_points = s["total_points"]
         standings.append(StandingOut(
-            rank=i + 1,
+            rank=current_rank,
             user_id=s["user_id"],
             name=s["name"],
             username=s["username"],
