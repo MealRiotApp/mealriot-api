@@ -407,6 +407,32 @@ async def set_username(
     return {"username": current_user.username, "friend_code": current_user.friend_code}
 
 
+@router.delete("/{user_id}", status_code=204)
+@limiter.limit("60/minute")
+async def remove_friend(
+    request: Request,
+    user_id: str,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(require_active_user),
+):
+    import uuid as uuid_mod
+    target_id = uuid_mod.UUID(user_id)
+    result = await db.execute(
+        select(Friendship).where(
+            Friendship.status == "accepted",
+            or_(
+                and_(Friendship.requester_id == current_user.id, Friendship.addressee_id == target_id),
+                and_(Friendship.requester_id == target_id, Friendship.addressee_id == current_user.id),
+            ),
+        )
+    )
+    friendship = result.scalar_one_or_none()
+    if not friendship:
+        raise HTTPException(404, detail="Not friends")
+    await db.delete(friendship)
+    await db.commit()
+
+
 @router.get("/{user_id}/profile", response_model=FriendProfileOut)
 @limiter.limit("60/minute")
 async def get_friend_profile(

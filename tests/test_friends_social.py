@@ -150,6 +150,37 @@ async def test_friend_profile_not_friends(client, db):
     assert resp.status_code == 403
 
 
+async def test_remove_friend_success(client, db):
+    user_a, sid_a = await make_active_user(db, email="a@test.com")
+    user_b, sid_b = await make_active_user(db, email="b@test.com")
+    await db.commit()
+
+    friendship = Friendship(requester_id=user_a.id, addressee_id=user_b.id, status="accepted")
+    db.add(friendship)
+    await db.commit()
+
+    with patch("app.middleware.auth.decode_jwt",
+               return_value=make_jwt_payload(user_a.email, supabase_id=sid_a)):
+        resp = await client.delete(f"/api/v1/friends/{user_b.id}",
+                                   headers={"Authorization": "Bearer faketoken"})
+    assert resp.status_code == 204
+
+    result = await db.execute(select(Friendship).where(Friendship.id == friendship.id))
+    assert result.scalar_one_or_none() is None
+
+
+async def test_remove_friend_not_friends(client, db):
+    user_a, sid_a = await make_active_user(db, email="a@test.com")
+    user_b, sid_b = await make_active_user(db, email="b@test.com")
+    await db.commit()
+
+    with patch("app.middleware.auth.decode_jwt",
+               return_value=make_jwt_payload(user_a.email, supabase_id=sid_a)):
+        resp = await client.delete(f"/api/v1/friends/{user_b.id}",
+                                   headers={"Authorization": "Bearer faketoken"})
+    assert resp.status_code == 404
+
+
 async def test_leaderboard_includes_avatar_url(client, db):
     user_a, sid_a = await make_active_user(db, email="a@test.com")
     user_a.username = "user_a"
